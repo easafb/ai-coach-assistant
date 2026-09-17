@@ -79,6 +79,33 @@ Follow these steps to set up the project locally.
 ### Installation
 
 1. Clone the repo:
-   ```sh
-   git clone [https://github.com/easafb/ai-coach-assistant.git](https://github.com/easasfb/ai-coach-assistant.git)
+  ```sh
+   git clone https://github.com/easafb/ai-coach-assistant.git
    cd ai-coach-assistant
+  ```
+
+2.Install NPM packages:
+```
+  npm install
+```
+
+3.Configure your Environment Variables:
+Create a .env.local file in the root directory. Never commit this file.
+```
+  NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+  NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+  GEMINI_API_KEY=your_gemini_api_key
+```
+4.Run the development server:
+```
+  npm run dev
+```
+
+
+
+
+
+
+
+
+
