@@ -100,6 +100,22 @@ Create a .env.local file in the root directory. Never commit this file.
 ```
   npm run dev
 ```
+📂 Folder Structure
+```
+📦 src
+ ┣ 📂 actions       # Server Actions for DB mutations (e.g., workoutActions.ts)
+ ┣ 📂 app           # Next.js App Router (Pages, Layouts, API Routes)
+ ┃ ┣ 📂 api         # REST Endpoints (e.g., OAuth Callback)
+ ┃ ┣ 📂 dashboard   # Protected user dashboard
+ ┃ ┗ 📂 workout     # Dynamic routing for active sessions
+ ┣ 📂 components    # Reusable UI components & Navigation
+ ┗ 📂 services      # External integrations (e.g., aiService.ts)
+```
+🏗️ Architecture & Security
+
+This project avoids exposing sensitive operations to the client browser by leveraging Next.js Server Actions.
+Database connections are instantiated dynamically per request on the server. There is no long-running database connection or exposed REST API containing business logic on the frontend. The Supabase SSR package ensures that session cookies are securely exchanged and verified purely on the server, resulting in a robust, production-ready architecture.
+
 
 
 
