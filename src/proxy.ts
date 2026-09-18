@@ -45,6 +45,19 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+
+  // Supabase, redirectTo değeri izinli Redirect URLs listesinde yoksa onu yok
+  // sayıp Site URL'e düşer; OAuth kodu o zaman /api/auth/callback yerine köke
+  // gelir ve kimse onu oturuma çevirmediği için kullanıcı giriş ekranında kalır.
+  // Vercel preview URL'leri her deploy'da değiştiği için bu durum kaçınılmaz;
+  // kodu doğru yere kendimiz yönlendiriyoruz.
+  const strayCode = request.nextUrl.searchParams.get("code");
+  if (path === "/" && strayCode) {
+    const callback = new URL("/api/auth/callback", request.url);
+    callback.searchParams.set("code", strayCode);
+    return NextResponse.redirect(callback);
+  }
+
   const isProtected = PROTECTED_PREFIXES.some((prefix) => path.startsWith(prefix));
 
   if (!user && isProtected) {
