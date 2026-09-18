@@ -24,7 +24,9 @@ export default function ActiveWorkout({ routineId, exercises }: Props) {
   const [seconds, setSeconds] = useState(0);
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
-  const [loggedSets, setLoggedSets] = useState(0);
+  // Set sayısını egzersiz bazında tutuyoruz. Tek bir toplam sayaç, kullanıcıya
+  // "bu egzersizde kaçtayım" sorusunun cevabını vermiyordu.
+  const [setsByExercise, setSetsByExercise] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -74,7 +76,11 @@ export default function ActiveWorkout({ routineId, exercises }: Props) {
       );
 
       if (result.ok) {
-        setLoggedSets((n) => n + 1);
+        const exerciseId = exercises[index].id;
+        setSetsByExercise((prev) => ({
+          ...prev,
+          [exerciseId]: (prev[exerciseId] ?? 0) + 1,
+        }));
         setReps("");
         weightInput.current?.focus();
       } else {
@@ -124,6 +130,14 @@ export default function ActiveWorkout({ routineId, exercises }: Props) {
 
   const current = exercises[index];
   const isLast = index === exercises.length - 1;
+  const doneSets = setsByExercise[current.id] ?? 0;
+  const targetSets = current.default_sets;
+  const totalSets = Object.values(setsByExercise).reduce((a, b) => a + b, 0);
+
+  // Hedefe ulaşınca otomatik geçmiyoruz: hedef bir plan, tavan değil.
+  // Fazladan set yapmak isteyen kullanıcının önünü kesmeden, sadece
+  // "Sonraki" butonunu görsel olarak öne çıkarıyoruz.
+  const targetReached = doneSets >= targetSets;
 
   return (
     <main className="min-h-dvh bg-[#050505] p-6 text-white">
@@ -136,8 +150,8 @@ export default function ActiveWorkout({ routineId, exercises }: Props) {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-xs font-bold uppercase text-neutral-500">Kaydedilen set</p>
-            <p className="font-mono text-2xl font-bold text-blue-400">{loggedSets}</p>
+            <p className="text-xs font-bold uppercase text-neutral-500">Toplam set</p>
+            <p className="font-mono text-2xl font-bold text-blue-400">{totalSets}</p>
           </div>
         </div>
 
@@ -152,9 +166,33 @@ export default function ActiveWorkout({ routineId, exercises }: Props) {
           <h1 className="mb-2 text-4xl font-black leading-tight">
             {current.exercise_name}
           </h1>
-          <p className="mb-8 font-bold text-neutral-400">
-            Hedef: {current.default_sets} × {current.default_reps}
+          <p className="mb-4 font-bold text-neutral-400">
+            Hedef: {targetSets} × {current.default_reps}
           </p>
+
+          <div className="mb-8 flex items-center gap-3">
+            <div className="flex gap-1.5" aria-hidden="true">
+              {Array.from({ length: Math.max(targetSets, doneSets) }).map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-2.5 w-2.5 rounded-full ${
+                    i < doneSets
+                      ? i < targetSets
+                        ? "bg-blue-500"
+                        : "bg-emerald-500"
+                      : "bg-neutral-200"
+                  }`}
+                />
+              ))}
+            </div>
+            <span
+              className={`text-sm font-black ${
+                targetReached ? "text-emerald-600" : "text-neutral-400"
+              }`}
+            >
+              {doneSets} / {targetSets} set
+            </span>
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-2xl bg-neutral-100 p-4">
@@ -205,7 +243,12 @@ export default function ActiveWorkout({ routineId, exercises }: Props) {
             disabled={isPending}
             className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-black py-5 text-lg font-black text-white transition-all hover:bg-neutral-800 active:scale-95 disabled:opacity-50"
           >
-            <CheckCircle2 size={20} /> {isPending ? "Kaydediliyor..." : "Seti Kaydet"}
+            <CheckCircle2 size={20} />
+            {isPending
+              ? "Kaydediliyor..."
+              : targetReached
+                ? "Fazladan Set Kaydet"
+                : "Seti Kaydet"}
           </button>
         </div>
 
@@ -229,9 +272,14 @@ export default function ActiveWorkout({ routineId, exercises }: Props) {
           ) : (
             <button
               onClick={() => setIndex((i) => Math.min(exercises.length - 1, i + 1))}
-              className="flex flex-[2] items-center justify-center gap-2 rounded-2xl bg-blue-600 py-4 font-bold shadow-lg shadow-blue-900/20"
+              className={`flex flex-[2] items-center justify-center gap-2 rounded-2xl py-4 font-bold transition-all ${
+                targetReached
+                  ? "bg-emerald-500 text-white shadow-lg shadow-emerald-900/30 ring-2 ring-emerald-400/40"
+                  : "bg-blue-600 shadow-lg shadow-blue-900/20"
+              }`}
             >
-              Sonraki Egzersiz <ChevronRight size={20} />
+              {targetReached ? "Hedef tamam — Sonraki" : "Sonraki Egzersiz"}
+              <ChevronRight size={20} />
             </button>
           )}
         </div>
