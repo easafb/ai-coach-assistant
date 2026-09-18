@@ -1,6 +1,6 @@
 "use client";
 
-import { Dumbbell, Sparkles } from "lucide-react";
+import { Dumbbell, Sparkles, Calendar } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -8,8 +8,9 @@ export default function BottomNav() {
   const pathname = usePathname();
 
   const navItems = [
-    { id: "train", label: "Train", href: "/dashboard", icon: Dumbbell },
-    { id: "coach", label: "coach", href: "/coach", icon: Sparkles },
+    { id: "train", label: "Antrenman", href: "/dashboard", icon: Dumbbell },
+    { id: "history", label: "Geçmiş", href: "/history", icon: Calendar },
+    { id: "coach", label: "Koç", href: "/coach", icon: Sparkles },
   ];
 
   return (
