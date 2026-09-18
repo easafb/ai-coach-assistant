@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/dal";
+import { findTemplate } from "@/lib/templates";
 import type { ActionResult, ExerciseDraft } from "@/types";
 
 const ok = <T,>(data: T): ActionResult<T> => ({ ok: true, data });
@@ -100,7 +101,7 @@ export async function startWorkoutAction(
 
   const { data, error } = await supabase
     .from("workout_sessions")
-    .insert([{ user_id: user.id, routine_name: routine.name }])
+    .insert([{ user_id: user.id, routine_id: routineId, routine_name: routine.name }])
     .select("id")
     .single();
 
@@ -192,4 +193,61 @@ export async function deleteRoutineAction(routineId: string): Promise<ActionResu
 
   revalidatePath("/dashboard");
   return ok(null);
+}
+
+// ==========================================
+// Şablondan program oluşturma
+// Şablon kullanıcının hesabına kopyalanır; sonrasında sahibi odur ve
+// istediği gibi düzenleyebilir.
+// ==========================================
+export async function createRoutinesFromTemplateAction(
+  templateId: string
+): Promise<ActionResult<{ created: number }>> {
+  const user = await requireUser();
+
+  const template = findTemplate(templateId);
+  if (!template) return fail("Şablon bulunamadı.");
+
+  const supabase = await createClient();
+
+  const { data: routines, error: routineError } = await supabase
+    .from("routines")
+    .insert(template.routines.map((routine) => ({ user_id: user.id, name: routine.name })))
+    .select("id, name");
+
+  if (routineError || !routines) {
+    return fail(routineError?.message ?? "Program oluşturulamadı.");
+  }
+
+  // Dönen satırların sırasına güvenmiyoruz; ada göre eşliyoruz.
+  const idByName = new Map(routines.map((row) => [row.name as string, row.id as string]));
+
+  const exerciseRows = template.routines.flatMap((routine) => {
+    const routineId = idByName.get(routine.name);
+    if (!routineId) return [];
+    return routine.exercises.map((exercise, index) => ({
+      routine_id: routineId,
+      exercise_name: exercise.name,
+      default_sets: exercise.sets,
+      default_reps: exercise.reps,
+      order_index: index,
+    }));
+  });
+
+  const { error: exerciseError } = await supabase
+    .from("routine_exercises")
+    .insert(exerciseRows);
+
+  if (exerciseError) {
+    // Yarım program bırakmıyoruz.
+    await supabase
+      .from("routines")
+      .delete()
+      .in("id", [...idByName.values()])
+      .eq("user_id", user.id);
+    return fail(exerciseError.message);
+  }
+
+  revalidatePath("/dashboard");
+  return ok({ created: routines.length });
 }

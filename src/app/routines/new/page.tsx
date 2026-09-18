@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Plus, Trash2, ChevronLeft } from "lucide-react";
 
 import { createRoutineAction } from "@/app/actions/workoutActions";
+import ExercisePicker from "@/components/routines/ExercisePicker";
 
 interface ExerciseInput {
   name: string;
@@ -102,12 +103,12 @@ export default function NewRoutinePage() {
                 key={index}
                 className="rounded-[2rem] border border-white/5 bg-[#1C1C1E] p-6"
               >
-                <input
-                  placeholder="Egzersiz adı"
-                  className="mb-4 w-full bg-transparent text-lg font-bold outline-none placeholder:text-slate-600"
-                  value={ex.name}
-                  onChange={(e) => updateExercise(index, "name", e.target.value)}
-                />
+                <div className="mb-4">
+                  <ExercisePicker
+                    value={ex.name}
+                    onChange={(name) => updateExercise(index, "name", name)}
+                  />
+                </div>
                 <div className="flex items-end gap-4">
                   <div className="flex-1">
                     <label className="text-[10px] font-bold uppercase text-slate-500">

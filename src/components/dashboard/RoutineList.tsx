@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Play, Calendar, ChevronRight, Trash2 } from "lucide-react";
 
 import { deleteRoutineAction } from "@/app/actions/workoutActions";
+import TemplatePicker from "@/components/dashboard/TemplatePicker";
 import type { Routine } from "@/types";
 
 export default function RoutineList({ routines }: { routines: Routine[] }) {
@@ -28,13 +29,8 @@ export default function RoutineList({ routines }: { routines: Routine[] }) {
     });
   };
 
-  if (routines.length === 0) {
-    return (
-      <div className="rounded-3xl border-2 border-dashed border-neutral-800 bg-neutral-900/30 p-12 text-center font-medium text-neutral-500">
-        Henüz bir rutin oluşturmadın.
-      </div>
-    );
-  }
+  // Boş durum artık bir çıkmaz sokak değil, başlangıç noktası.
+  if (routines.length === 0) return <TemplatePicker />;
 
   return (
     <>
