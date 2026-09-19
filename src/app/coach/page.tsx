@@ -5,7 +5,7 @@ import CoachConsultation from "@/components/coach/CoachConsultation";
 
 export default function CoachPage() {
   return (
-    <main className="min-h-dvh bg-[#050505] p-6 pb-32 text-white">
+    <main className="min-h-dvh bg-[#050505] p-6 pb-[calc(8rem+env(safe-area-inset-bottom))] text-white">
       <div className="mx-auto max-w-md">
         <header className="mb-12 pt-8">
           <div className="mb-2 flex items-center gap-2">

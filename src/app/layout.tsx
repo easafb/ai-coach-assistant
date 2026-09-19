@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -16,6 +16,17 @@ export const metadata: Metadata = {
   title: "Coach.ai — Yapay Zekâ Destekli Antrenman Asistanı",
   description:
     "Geçmiş antrenmanlarını okuyup bir sonraki seansını planlayan dijital antrenör.",
+};
+
+// Uygulama esas olarak telefonda kullanılıyor.
+// viewportFit: "cover" çentikli/ev-göstergeli cihazlarda env(safe-area-inset-*)
+// değerlerinin dolmasını sağlar; alt navigasyon bunlara dayanıyor.
+// maximum-scale bilerek kısıtlanmadı: yakınlaştırmayı engellemek erişilebilirlik ihlali.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#050505",
 };
 
 export default function RootLayout({

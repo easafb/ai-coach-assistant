@@ -14,7 +14,7 @@ export default function BottomNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-xl border-t border-white/5 pb-8 pt-4 px-12 flex justify-around items-center z-50">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-white/5 bg-black/80 px-6 pt-3 backdrop-blur-xl pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = pathname === item.href;
@@ -23,7 +23,7 @@ export default function BottomNav() {
           <Link 
             key={item.id} 
             href={item.href} 
-            className={`flex flex-col items-center gap-1 transition-all ${isActive ? "text-blue-500 scale-110" : "text-slate-500 hover:text-slate-300"}`}
+            className={`flex min-h-12 min-w-16 flex-col items-center justify-center gap-1 rounded-xl transition-all ${isActive ? "scale-110 text-blue-500" : "text-slate-500 hover:text-slate-300"}`}
           >
             <Icon size={24} strokeWidth={isActive ? 3 : 2} />
             <span className="text-[10px] font-bold uppercase tracking-widest">{item.label}</span>

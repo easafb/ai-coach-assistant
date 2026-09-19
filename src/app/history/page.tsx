@@ -8,7 +8,7 @@ export default async function HistoryPage() {
   const history = await getWorkoutHistory();
 
   return (
-    <div className="min-h-dvh bg-[#050505] p-6 pb-32 text-white md:p-12">
+    <div className="min-h-dvh bg-[#050505] p-6 pb-[calc(8rem+env(safe-area-inset-bottom))] text-white md:p-12">
       <div className="mx-auto max-w-4xl">
         <Link
           href="/dashboard"

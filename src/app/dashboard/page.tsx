@@ -17,7 +17,7 @@ export default async function DashboardPage() {
   ]);
 
   return (
-    <div className="min-h-dvh bg-[#050505] p-6 pb-32 text-white md:p-12">
+    <div className="min-h-dvh bg-[#050505] p-6 pb-[calc(8rem+env(safe-area-inset-bottom))] text-white md:p-12">
       <div className="mx-auto max-w-6xl">
         <div className="mb-12 flex flex-wrap items-end justify-between gap-4">
           <div>
