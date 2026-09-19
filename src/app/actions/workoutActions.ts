@@ -10,6 +10,17 @@ import type { ActionResult, ExerciseDraft } from "@/types";
 const ok = <T,>(data: T): ActionResult<T> => ({ ok: true, data });
 const fail = (error: string): ActionResult<never> => ({ ok: false, error });
 
+/**
+ * Veritabanı hatalarını kullanıcıya olduğu gibi göstermiyoruz.
+ * "invalid input syntax for type integer" gibi mesajlar kullanıcı için
+ * anlamsız, üstelik şema detayını dışarı sızdırıyor. Gerçek hata sunucu
+ * loguna düşer; kullanıcı anlaşılır bir mesaj görür.
+ */
+function dbFail(context: string, error: { message: string }): ActionResult<never> {
+  console.error(`[${context}]`, error.message);
+  return { ok: false, error: "İşlem tamamlanamadı. Lütfen tekrar dene." };
+}
+
 // Bir oturumun (session) gerçekten çağıran kullanıcıya ait olduğunu doğrular.
 // RLS'e ek ikinci savunma hattı: tek bir eksik policy tüm veriyi açmasın.
 async function assertSessionOwner(sessionId: string, userId: string) {
@@ -55,7 +66,9 @@ export async function createRoutineAction(
     .single();
 
   if (routineError || !routine) {
-    return fail(routineError?.message ?? "Rutin oluşturulamadı.");
+    return routineError
+      ? dbFail("createRoutine", routineError)
+      : fail("Rutin oluşturulamadı.");
   }
 
   const { error: exerciseError } = await supabase.from("routine_exercises").insert(
@@ -71,7 +84,7 @@ export async function createRoutineAction(
   if (exerciseError) {
     // Alt egzersizler yazılamadıysa yarım rutin bırakmıyoruz.
     await supabase.from("routines").delete().eq("id", routine.id).eq("user_id", user.id);
-    return fail(exerciseError.message);
+    return dbFail("createRoutine.exercises", exerciseError);
   }
 
   revalidatePath("/dashboard");
@@ -96,7 +109,7 @@ export async function startWorkoutAction(
     .eq("user_id", user.id)
     .maybeSingle();
 
-  if (routineError) return fail(routineError.message);
+  if (routineError) return dbFail("startWorkout.lookup", routineError);
   if (!routine) return fail("Rutin bulunamadı.");
 
   const { data, error } = await supabase
@@ -105,7 +118,8 @@ export async function startWorkoutAction(
     .select("id")
     .single();
 
-  if (error || !data) return fail(error?.message ?? "Antrenman başlatılamadı.");
+  if (error) return dbFail("startWorkout.insert", error);
+  if (!data) return fail("Antrenman başlatılamadı.");
   return ok({ sessionId: data.id as string });
 }
 
@@ -135,7 +149,7 @@ export async function logSetAction(
     .from("set_logs")
     .insert([{ session_id: sessionId, exercise_name: exerciseName, weight, reps }]);
 
-  if (error) return fail(error.message);
+  if (error) return dbFail("logSet", error);
   return ok(null);
 }
 
@@ -153,12 +167,14 @@ export async function finishWorkoutAction(sessionId: string): Promise<ActionResu
     .select("weight, reps")
     .eq("session_id", sessionId);
 
-  if (setsError) return fail(setsError.message);
+  if (setsError) return dbFail("finishWorkout.sets", setsError);
 
-  const totalVolume = (sets ?? []).reduce(
+  // Kayan nokta gürültüsü birikmesin diye iki ondalığa sabitliyoruz.
+  const rawVolume = (sets ?? []).reduce(
     (sum, set) => sum + Number(set.weight ?? 0) * Number(set.reps ?? 0),
     0
   );
+  const totalVolume = Math.round(rawVolume * 100) / 100;
 
   const { data, error } = await supabase
     .from("workout_sessions")
@@ -168,7 +184,7 @@ export async function finishWorkoutAction(sessionId: string): Promise<ActionResu
     .select("id")
     .maybeSingle();
 
-  if (error) return fail(error.message);
+  if (error) return dbFail("finishWorkout.update", error);
   if (!data) return fail("Bu antrenmana erişim yetkin yok.");
 
   revalidatePath("/dashboard");
@@ -189,7 +205,7 @@ export async function deleteRoutineAction(routineId: string): Promise<ActionResu
     .eq("id", routineId)
     .eq("user_id", user.id);
 
-  if (error) return fail(error.message);
+  if (error) return dbFail("deleteRoutine", error);
 
   revalidatePath("/dashboard");
   return ok(null);
@@ -216,7 +232,9 @@ export async function createRoutinesFromTemplateAction(
     .select("id, name");
 
   if (routineError || !routines) {
-    return fail(routineError?.message ?? "Program oluşturulamadı.");
+    return routineError
+      ? dbFail("createFromTemplate", routineError)
+      : fail("Program oluşturulamadı.");
   }
 
   // Dönen satırların sırasına güvenmiyoruz; ada göre eşliyoruz.
@@ -245,7 +263,7 @@ export async function createRoutinesFromTemplateAction(
       .delete()
       .in("id", [...idByName.values()])
       .eq("user_id", user.id);
-    return fail(exerciseError.message);
+    return dbFail("createFromTemplate.exercises", exerciseError);
   }
 
   revalidatePath("/dashboard");
