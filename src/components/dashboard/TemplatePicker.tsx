@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Sparkles, Plus } from "lucide-react";
 
@@ -13,6 +14,7 @@ import { ROUTINE_TEMPLATES } from "@/lib/templates";
  * olduğu an burasıydı.
  */
 export default function TemplatePicker() {
+  const router = useRouter();
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -22,11 +24,14 @@ export default function TemplatePicker() {
     setError(null);
     startTransition(async () => {
       const result = await createRoutinesFromTemplateAction(templateId);
-      if (!result.ok) {
+      if (result.ok) {
+        // Ayrı şablon sayfasından çağrıldığında kullanıcıyı panele alıyoruz;
+        // boş panelde çağrıldığında zaten oradayız ve liste tazeleniyor.
+        router.push("/dashboard");
+      } else {
         setError(result.error);
         setSelected(null);
       }
-      // Başarılıysa revalidatePath listeyi tazeliyor, bu bileşen kayboluyor.
     });
   };
 
