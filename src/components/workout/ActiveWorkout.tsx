@@ -21,6 +21,7 @@ import {
 } from "@/app/actions/workoutActions";
 import type { ProgressionDecision } from "@/lib/progression";
 import type { WorkoutPlanItem } from "@/lib/adjustments";
+import { useWakeLock } from "@/hooks/useWakeLock";
 import ExerciseClassifier from "@/components/routines/ExerciseClassifier";
 
 interface Props {
@@ -62,6 +63,9 @@ export default function ActiveWorkout({ routineId, plan }: Props) {
   const [isPending, startTransition] = useTransition();
 
   const hasStarted = sessionId !== null;
+
+  // Antrenman sürerken ekran sönmesin: setler arasında telefon cebe giriyor.
+  useWakeLock(hasStarted);
 
   useEffect(() => {
     if (!hasStarted) return;

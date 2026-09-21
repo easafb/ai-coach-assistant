@@ -1,6 +1,7 @@
 "use server";
 
 import { requireUser } from "@/lib/dal";
+import { checkAiRateLimit, recordAiRequest } from "@/lib/rateLimit";
 import {
   getUserExerciseNames,
   getExerciseResolver,
@@ -116,7 +117,20 @@ export async function requestCoachPlan(
   feedback: string
 ): Promise<ActionResult<CoachPlan>> {
   // Bu bir Server Action, yani public endpoint. Auth kontrolü zorunlu.
-  await requireUser();
+  const user = await requireUser();
+
+  // Limit sağlayıcıya gitmeden önce kontrol ediliyor: reddedilen istek
+  // hiçbir maliyet üretmemeli.
+  const limit = await checkAiRateLimit(user.id);
+  if (!limit.allowed) {
+    return {
+      ok: false,
+      error:
+        limit.reason === "user"
+          ? "Bugünlük koç hakkın doldu. Yarın tekrar deneyebilirsin."
+          : "Coach.ai şu an çok yoğun. Lütfen daha sonra tekrar dene.",
+    };
+  }
 
   const trimmed = feedback.trim();
   if (trimmed.length < 10) {
@@ -144,10 +158,16 @@ export async function requestCoachPlan(
     return { ok: false, error: FALLBACK };
   }
 
-  // Katalogdan yalnızca kas grubu bilgisini veriyoruz: model ikameyi
-  // doğru gruptan seçebilsin diye.
+  // Katalogdan yalnızca kullanıcının FİİLEN çalıştığı kas gruplarını
+  // gönderiyoruz. Tam katalog (114 hareket) prompt'un en büyük parçasıydı;
+  // model zaten yalnızca aynı gruptan ikame önerebildiği için diğer
+  // grupları göndermenin faydası yok.
+  const usedGroups = new Set(
+    userExercises.map((name) => resolve(name)?.group).filter(Boolean)
+  );
   const catalogByGroup = EXERCISE_CATALOG.reduce<Record<string, string[]>>(
     (acc, exercise) => {
+      if (!usedGroups.has(exercise.group)) return acc;
       (acc[exercise.group] ??= []).push(exercise.name);
       return acc;
     },
@@ -211,6 +231,9 @@ export async function requestCoachPlan(
           responseMimeType: "application/json",
           responseSchema: RESPONSE_SCHEMA,
           temperature: 0.4,
+          // Şema zaten kısa bir yanıt dayatıyor; bu, beklenmedik bir
+          // uzun üretimde maliyeti sınırlayan ikinci tavan.
+          maxOutputTokens: 800,
         },
       }),
     });
@@ -224,6 +247,13 @@ export async function requestCoachPlan(
     }
 
     const data = await response.json();
+
+    // Maliyet takibi ve limit sayımı. Başarısız olursa isteği bozmuyoruz.
+    await recordAiRequest(user.id, {
+      promptTokens: data?.usageMetadata?.promptTokenCount,
+      outputTokens: data?.usageMetadata?.candidatesTokenCount,
+    });
+
     const text: unknown = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (typeof text !== "string") return { ok: false, error: FALLBACK };
 
