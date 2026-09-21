@@ -1,7 +1,11 @@
 "use server";
 
 import { requireUser } from "@/lib/dal";
-import { getUserExerciseNames, getExerciseResolver } from "@/lib/queries";
+import {
+  getUserExerciseNames,
+  getExerciseResolver,
+  getTrainingSummary,
+} from "@/lib/queries";
 import { validateAdjustments, type Adjustment, type RawAdjustment } from "@/lib/adjustments";
 import { EXERCISE_CATALOG } from "@/lib/exercises";
 import type { ActionResult } from "@/types";
@@ -19,11 +23,32 @@ export interface CoachPlan {
 
 const SYSTEM_INSTRUCTION = `Sen Coach.ai adlı profesyonel bir fitness asistanısın.
 
-Kullanıcı sana nasıl hissettiğini anlatır (ağrı, bitkinlik, uyku, stres).
-Görevin, onun antrenman programında HANGİ HAREKETLERİN nasıl değişmesi
-gerektiğine karar vermek.
+Kullanıcı sana iki türlü mesaj yazabilir; hangisi olduğunu anlayıp ona göre
+davran:
 
-HAREKET SEÇİMİ
+A) SORU — antrenmanı hakkında bilgi istiyor.
+   "Bu hafta ne kadar kaldırdım?", "Bench'te en iyim kaç?", "Kaç gün gittim?"
+   Bu durumda sana verilen ANTRENMAN ÖZETİ'ni kullanarak "summary" alanında
+   cevap ver ve "adjustments" alanını BOŞ bırak. Programını değiştirme.
+
+B) DURUM BİLDİRİMİ — nasıl hissettiğini anlatıyor.
+   Ağrı, bitkinlik, kötü uyku, sakatlık. Bu durumda programında hangi
+   hareketlerin değişmesi gerektiğine karar ver.
+
+Mesaj ikisini birden içerebilir; o zaman ikisini de yap.
+
+SAYILAR
+- Yalnızca sana verilen ANTRENMAN ÖZETİ'ndeki rakamları kullan.
+- YALNIZCA sorulan şeyi cevapla. Sorulmayan istatistiği kendiliğinden ekleme.
+  Kullanıcı "bu hafta kaç antrenman yaptım?" diye sorduysa sadece antrenman
+  sayısını söyle; hacim, rekor veya başka hareketleri anlatma.
+- Kullanıcı sadece bir durum bildiriyorsa (soru sormuyorsa) hiç istatistik
+  verme; doğrudan ne değiştirdiğini anlat.
+- ASLA hesap yapma, tahmin etme, rakam uydurma. Özet'te olmayan bir bilgi
+  sorulursa "Bu bilgi elimde yok" de.
+- Kullanıcının hiç antrenman verisi yoksa bunu açıkça söyle.
+
+HAREKET SEÇİMİ (yalnızca B durumunda)
 - Yalnızca sana verilen egzersiz listesindeki hareketleri kullan. Listede
   olmayan bir hareket adı uydurma.
 - Her hareket için üç eylemden birini seç:
@@ -33,18 +58,19 @@ HAREKET SEÇİMİ
   * "skip" — bu hareket bugün hiç yapılmamalı
 - "swap" seçersen "substitute" alanına sana verilen katalogdan AYNI kas
   grubundaki bir hareket yaz.
-- ASLA ağırlık, kilo, set veya tekrar sayısı belirtme. Bunları sistem hesaplar.
-- Sadece gerçekten etkilenen hareketleri listele. Şikayetle ilgisi olmayan
-  hareketlere dokunma; boş liste döndürmek tamamen geçerli bir yanıttır.
+- ASLA ağırlık, kilo, set veya tekrar sayısı ÖNERME. Bunları sistem hesaplar.
+  (Geçmiş verisini aktarırken rakam söyleyebilirsin; yasak olan yeni hedef
+  belirlemek.)
+- Sadece gerçekten etkilenen hareketleri listele. Boş liste döndürmek
+  tamamen geçerli bir yanıttır.
 
 DİL
-- Kullanıcıya daima SEN diye hitap et. "siz", "yapmalısınız", "hissediyorsunuz"
-  gibi ifadeler kullanma.
+- Kullanıcıya daima SEN diye hitap et. "siz", "yapmalısınız" kullanma.
 - "reason" alanını kullanıcıya hitaben, tek cümle ve en fazla 20 kelime yaz.
-  Örnek: "Omzunu zorlamamak için bu hareketi bugün atlıyoruz."
 - "reason" alanını kullanıcının ağzından yazma. "Omzumda ağrı var" YANLIŞ,
   "Omzundaki ağrı geçene kadar" DOĞRU.
-- "summary" alanına Türkçe, en fazla iki cümlelik bir açıklama yaz.
+- "summary" alanı Türkçe ve EN FAZLA İKİ CÜMLE olmalı. Soru tek ise tek
+  cümleyle cevapla. Kısa tut; dolgu cümlesi ekleme.
 
 TIBBİ UYARI
 - Tıbbi teşhis koyma.
@@ -100,9 +126,10 @@ export async function requestCoachPlan(
     return { ok: false, error: "Mesaj çok uzun." };
   }
 
-  const [userExercises, resolve] = await Promise.all([
+  const [userExercises, resolve, summary] = await Promise.all([
     getUserExerciseNames(),
     getExerciseResolver(),
+    getTrainingSummary(),
   ]);
   if (userExercises.length === 0) {
     return {
@@ -154,7 +181,27 @@ export async function requestCoachPlan(
                   "",
                   `İkame seçebileceğin katalog (kas grubuna göre): ${JSON.stringify(catalogByGroup)}`,
                   "",
-                  `Kullanıcının bildirdiği durum: "${trimmed}"`,
+                  "ANTRENMAN ÖZETİ (yalnızca bu rakamları kullan):",
+                  JSON.stringify({
+                    buHafta: {
+                      antrenmanSayisi: summary.thisWeek.sessions,
+                      toplamHacimKg: summary.thisWeek.volume,
+                    },
+                    gecenHafta: {
+                      antrenmanSayisi: summary.lastWeek.sessions,
+                      toplamHacimKg: summary.lastWeek.volume,
+                    },
+                    kayitliToplamAntrenman: summary.totalSessions,
+                    hareketler: summary.exercises.map((e) => ({
+                      ad: e.name,
+                      sonCalismaAgirligiKg: e.lastWeight,
+                      enIyiAgirlikKg: e.bestWeight,
+                      kacSeansYapildi: e.sessionCount,
+                      sonYapilma: e.lastPerformed.slice(0, 10),
+                    })),
+                  }),
+                  "",
+                  `Kullanıcının mesajı: "${trimmed}"`,
                 ].join("\n"),
               },
             ],

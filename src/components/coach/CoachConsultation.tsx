@@ -70,19 +70,22 @@ export default function CoachConsultation() {
           htmlFor="condition"
           className="mb-4 block text-[10px] font-bold uppercase tracking-widest text-slate-500"
         >
-          Durumun / Ağrın
+          Ne sormak ya da anlatmak istersin?
         </label>
         <textarea
           id="condition"
           className="min-h-[120px] w-full resize-none bg-transparent text-lg font-medium outline-none placeholder:text-neutral-700"
-          placeholder="Örn. Bench press sırasında sol omzumda keskin bir ağrı hissediyorum, dün de kötü uyudum..."
+          placeholder={
+            "Soru sorabilirsin: \u201cBu hafta ne kadar kaldırdım?\u201d\n" +
+            "Durumunu anlatabilirsin: \u201cBench press\u2019te sol omzum ağrıyor.\u201d"
+          }
           value={input}
           onChange={(e) => setInput(e.target.value)}
           maxLength={1000}
         />
         <button
           onClick={consult}
-          disabled={isPending || input.trim().length < 10}
+          disabled={isPending || input.trim().length < 5}
           className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white py-4 font-black text-black transition-all active:scale-95 disabled:opacity-30"
         >
           {isPending && !plan ? (
@@ -91,7 +94,7 @@ export default function CoachConsultation() {
             </>
           ) : (
             <>
-              <Send size={18} /> Programımı Ayarla
+              <Send size={18} /> Koça Gönder
             </>
           )}
         </button>
@@ -139,12 +142,7 @@ export default function CoachConsultation() {
             </div>
           )}
 
-          {plan.adjustments.length === 0 ? (
-            <p className="rounded-2xl bg-white/5 p-4 text-sm text-slate-400">
-              Programında değiştirilmesi gereken bir hareket görmüyorum. Planına
-              olduğu gibi devam edebilirsin.
-            </p>
-          ) : (
+          {plan.adjustments.length > 0 && (
             <>
               <ul className="mb-6 space-y-2">
                 {plan.adjustments.map((adjustment) => {

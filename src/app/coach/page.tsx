@@ -21,7 +21,8 @@ export default async function CoachPage() {
           </div>
           <h1 className="text-4xl font-black italic tracking-tighter">COACH.AI</h1>
           <p className="mt-2 text-sm font-medium text-slate-500">
-            Nasıl hissettiğini anlat, programını buna göre değiştireyim.
+            Antrenmanın hakkında soru sor ya da nasıl hissettiğini anlat —
+            gerekiyorsa programını değiştireyim.
           </p>
         </header>
 
