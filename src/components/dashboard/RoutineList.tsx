@@ -34,7 +34,7 @@ export default function RoutineList({ routines }: { routines: Routine[] }) {
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="stagger-children grid grid-cols-1 gap-4 md:grid-cols-2">
         {routines.map((routine) => (
           <div key={routine.id} className="group relative">
             <button
@@ -77,7 +77,7 @@ export default function RoutineList({ routines }: { routines: Routine[] }) {
           aria-modal="true"
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6 backdrop-blur-sm"
         >
-          <div className="w-full max-w-sm rounded-3xl border border-neutral-800 bg-neutral-900 p-8">
+          <div className="animate-rise w-full max-w-sm rounded-3xl border border-neutral-800 bg-neutral-900 p-8">
             <h3 className="mb-2 text-xl font-bold">Rutini sil</h3>
             <p className="mb-6 text-sm text-neutral-400">
               <span className="font-semibold text-white">{pendingDelete.name}</span> ve

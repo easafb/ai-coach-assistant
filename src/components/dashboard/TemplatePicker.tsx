@@ -50,7 +50,7 @@ export default function TemplatePicker() {
         </p>
       )}
 
-      <div className="space-y-4">
+      <div className="stagger-children space-y-4">
         {ROUTINE_TEMPLATES.map((template) => (
           <div
             key={template.id}

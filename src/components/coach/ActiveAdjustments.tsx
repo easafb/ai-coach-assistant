@@ -45,7 +45,7 @@ export default function ActiveAdjustments({
         Programında aktif değişiklikler
       </h2>
 
-      <ul className="space-y-2">
+      <ul className="stagger-children space-y-2">
         {adjustments.map((adjustment) => {
           const Icon = ICON[adjustment.action];
           return (

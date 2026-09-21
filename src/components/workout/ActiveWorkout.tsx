@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
+  Loader2,
   CheckCircle2,
   ChevronRight,
   Dumbbell,
@@ -153,7 +154,7 @@ export default function ActiveWorkout({ routineId, plan }: Props) {
             Geçmiş antrenmanlarına göre hazırlandı.
           </p>
 
-          <ul className="mb-8 space-y-3">
+          <ul className="stagger-children mb-8 space-y-3">
             {active.map((item) => (
               <li
                 key={item.exerciseId}
@@ -255,7 +256,11 @@ export default function ActiveWorkout({ routineId, plan }: Props) {
               disabled={isPending}
               className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-5 text-lg font-black disabled:opacity-50"
             >
-              <Play size={20} fill="currentColor" />
+              {isPending ? (
+                <Loader2 size={20} className="animate-spin" />
+              ) : (
+                <Play size={20} fill="currentColor" />
+              )}
               {isPending ? "Başlatılıyor..." : "Antrenmanı Başlat"}
             </button>
           )}
@@ -288,7 +293,10 @@ export default function ActiveWorkout({ routineId, plan }: Props) {
           </div>
         </div>
 
-        <div className="mb-6 rounded-[2.5rem] bg-white p-8 text-black shadow-2xl">
+        <div
+          key={current.exerciseId}
+          className="animate-rise mb-6 rounded-[2.5rem] bg-white p-8 text-black shadow-2xl"
+        >
           <div className="mb-6 flex items-start justify-between">
             <span className="rounded-full bg-blue-100 px-4 py-1 text-xs font-black uppercase text-blue-600">
               Egzersiz {index + 1}/{active.length}
@@ -392,7 +400,11 @@ export default function ActiveWorkout({ routineId, plan }: Props) {
             disabled={isPending}
             className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-black py-5 text-lg font-black text-white transition-all hover:bg-neutral-800 active:scale-95 disabled:opacity-50"
           >
-            <CheckCircle2 size={20} />
+            {isPending ? (
+              <Loader2 size={20} className="animate-spin" />
+            ) : (
+              <CheckCircle2 size={20} />
+            )}
             {isPending
               ? "Kaydediliyor..."
               : targetReached

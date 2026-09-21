@@ -1,7 +1,15 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Send, AlertTriangle, Activity, ArrowLeftRight, TrendingDown, Ban } from "lucide-react";
+import {
+  Send,
+  Loader2,
+  AlertTriangle,
+  Activity,
+  ArrowLeftRight,
+  TrendingDown,
+  Ban,
+} from "lucide-react";
 
 import { requestCoachPlan, type CoachPlan } from "@/services/aiService";
 import { saveAdjustmentsAction } from "@/app/actions/workoutActions";
@@ -78,7 +86,9 @@ export default function CoachConsultation() {
           className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white py-4 font-black text-black transition-all active:scale-95 disabled:opacity-30"
         >
           {isPending && !plan ? (
-            "Programın inceleniyor..."
+            <>
+              <Loader2 size={18} className="animate-spin" /> Programın inceleniyor...
+            </>
           ) : (
             <>
               <Send size={18} /> Programımı Ayarla
@@ -106,7 +116,7 @@ export default function CoachConsultation() {
       )}
 
       {plan && (
-        <div className="rounded-[2.5rem] border border-blue-500/20 bg-blue-600/10 p-6">
+        <div className="animate-rise rounded-[2.5rem] border border-blue-500/20 bg-blue-600/10 p-6">
           <div className="mb-4 flex items-center gap-2">
             <Activity className="text-blue-500" size={20} />
             <span className="text-xs font-black uppercase text-blue-500">

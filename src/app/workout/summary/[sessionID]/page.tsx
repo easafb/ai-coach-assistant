@@ -20,7 +20,7 @@ export default async function WorkoutSummaryPage({
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-black p-6 text-white">
-      <div className="w-full max-w-md">
+      <div className="animate-rise w-full max-w-md">
         <div className="mb-10 text-center">
           <div className="mb-4 inline-flex rounded-[2rem] bg-yellow-400/10 p-5">
             <Trophy size={48} className="text-yellow-500" />

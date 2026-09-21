@@ -58,7 +58,7 @@ export default function FeedbackButton() {
       aria-label="Geri bildirim"
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-4 backdrop-blur-sm sm:items-center"
     >
-      <div className="w-full max-w-md rounded-3xl border border-neutral-800 bg-neutral-900 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6">
+      <div className="animate-rise w-full max-w-md rounded-3xl border border-neutral-800 bg-neutral-900 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-white">Geri bildirim</h2>
