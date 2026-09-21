@@ -1,245 +1,346 @@
 "use server";
 
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 
-// 1. Yeni Bir Antrenman Rutini Oluşturma
-export async function createRoutineAction(name: string, exercises: { name: string, sets: number, reps: number }[]) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
-  );
+import { createClient } from "@/lib/supabase/server";
+import { requireUser } from "@/lib/dal";
+import { findTemplate } from "@/lib/templates";
+import { validateAdjustments, type Adjustment } from "@/lib/adjustments";
+import { getUserExerciseNames } from "@/lib/queries";
+import type { ActionResult, ExerciseDraft } from "@/types";
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Oturum açmanız gerekiyor.");
+const ok = <T,>(data: T): ActionResult<T> => ({ ok: true, data });
+const fail = (error: string): ActionResult<never> => ({ ok: false, error });
 
-  const { data: routine, error: rError } = await supabase
-    .from("routines")
-    .insert([{ user_id: user.id, name }])
-    .select()
-    .single();
-
-  if (rError) return { error: rError.message };
-
-  const exerciseData = exercises.map((ex, index) => ({
-    routine_id: routine.id,
-    exercise_name: ex.name,
-    default_sets: ex.sets,
-    default_reps: ex.reps,
-    order_index: index,
-  }));
-
-  const { error: exError } = await supabase.from("routine_exercises").insert(exerciseData);
-  
-  if (exError) return { error: exError.message };
-
-  // DÜZELTME: Ana üssümüz artık dashboard olduğu için burayı güncelledik
-  revalidatePath("/dashboard");
-  return { success: true, routineId: routine.id };
+/**
+ * Veritabanı hatalarını kullanıcıya olduğu gibi göstermiyoruz.
+ * "invalid input syntax for type integer" gibi mesajlar kullanıcı için
+ * anlamsız, üstelik şema detayını dışarı sızdırıyor. Gerçek hata sunucu
+ * loguna düşer; kullanıcı anlaşılır bir mesaj görür.
+ */
+function dbFail(context: string, error: { message: string }): ActionResult<never> {
+  console.error(`[${context}]`, error.message);
+  return { ok: false, error: "İşlem tamamlanamadı. Lütfen tekrar dene." };
 }
 
-// 2. Antrenman Oturumunu Başlatma
-export async function startWorkoutAction(routineName: string) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
+// Bir oturumun (session) gerçekten çağıran kullanıcıya ait olduğunu doğrular.
+// RLS'e ek ikinci savunma hattı: tek bir eksik policy tüm veriyi açmasın.
+async function assertSessionOwner(sessionId: string, userId: string) {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("workout_sessions")
+    .select("id")
+    .eq("id", sessionId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) return false;
+  return data !== null;
+}
+
+// ==========================================
+// Rutin oluşturma
+// ==========================================
+export async function createRoutineAction(
+  name: string,
+  exercises: ExerciseDraft[]
+): Promise<ActionResult<{ routineId: string }>> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const trimmedName = name.trim();
+  if (!trimmedName) return fail("Rutin adı boş olamaz.");
+
+  const cleaned = exercises
+    .map((ex) => ({
+      name: ex.name.trim(),
+      sets: Math.max(1, Math.min(20, Math.trunc(ex.sets) || 0)),
+      reps: Math.max(1, Math.min(100, Math.trunc(ex.reps) || 0)),
+    }))
+    .filter((ex) => ex.name.length > 0);
+
+  if (cleaned.length === 0) return fail("En az bir egzersiz eklemelisin.");
+
+  const { data: routine, error: routineError } = await supabase
+    .from("routines")
+    .insert([{ user_id: user.id, name: trimmedName }])
+    .select("id")
+    .single();
+
+  if (routineError || !routine) {
+    return routineError
+      ? dbFail("createRoutine", routineError)
+      : fail("Rutin oluşturulamadı.");
+  }
+
+  const { error: exerciseError } = await supabase.from("routine_exercises").insert(
+    cleaned.map((ex, index) => ({
+      routine_id: routine.id,
+      exercise_name: ex.name,
+      default_sets: ex.sets,
+      default_reps: ex.reps,
+      order_index: index,
+    }))
   );
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error("Yetkisiz erişim.");
+  if (exerciseError) {
+    // Alt egzersizler yazılamadıysa yarım rutin bırakmıyoruz.
+    await supabase.from("routines").delete().eq("id", routine.id).eq("user_id", user.id);
+    return dbFail("createRoutine.exercises", exerciseError);
+  }
+
+  revalidatePath("/dashboard");
+  return ok({ routineId: routine.id as string });
+}
+
+// ==========================================
+// Antrenman oturumu başlatma
+// ==========================================
+export async function startWorkoutAction(
+  routineId: string
+): Promise<ActionResult<{ sessionId: string }>> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  // Rutin adını istemciden almıyoruz; sahibi doğrulanmış kaydın adını kullanıyoruz.
+  // Eski kod sabit "Active Session" yazdığı için geçmiş ekranı hep aynı adı gösteriyordu.
+  const { data: routine, error: routineError } = await supabase
+    .from("routines")
+    .select("name")
+    .eq("id", routineId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (routineError) return dbFail("startWorkout.lookup", routineError);
+  if (!routine) return fail("Rutin bulunamadı.");
 
   const { data, error } = await supabase
     .from("workout_sessions")
-    .insert([{ user_id: user.id, routine_name: routineName }])
-    .select()
+    .insert([{ user_id: user.id, routine_id: routineId, routine_name: routine.name }])
+    .select("id")
     .single();
 
-  if (error) return { error: error.message };
-  return { session: data };
+  if (error) return dbFail("startWorkout.insert", error);
+  if (!data) return fail("Antrenman başlatılamadı.");
+  return ok({ sessionId: data.id as string });
 }
 
-// 3. Set Kaydı Tutma
-export async function logSetAction(sessionId: string, exerciseName: string, weight: number, reps: number) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
-  );
+// ==========================================
+// Set kaydı
+// ==========================================
+export async function logSetAction(
+  sessionId: string,
+  exerciseName: string,
+  weight: number,
+  reps: number
+): Promise<ActionResult> {
+  const user = await requireUser();
 
+  if (!Number.isFinite(weight) || weight < 0 || weight > 1000) {
+    return fail("Geçersiz ağırlık.");
+  }
+  if (!Number.isInteger(reps) || reps < 1 || reps > 100) {
+    return fail("Geçersiz tekrar sayısı.");
+  }
+  if (!(await assertSessionOwner(sessionId, user.id))) {
+    return fail("Bu antrenmana erişim yetkin yok.");
+  }
+
+  const supabase = await createClient();
   const { error } = await supabase
     .from("set_logs")
     .insert([{ session_id: sessionId, exercise_name: exerciseName, weight, reps }]);
 
-  if (error) return { error: error.message };
-  return { success: true };
+  if (error) return dbFail("logSet", error);
+  return ok(null);
 }
 
-// 4. Antrenmanı Bitirme ve Hacim Kaydetme
-export async function finishWorkoutAction(sessionId: string, totalVolume: number) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
+// ==========================================
+// Antrenmanı bitirme
+// ==========================================
+export async function finishWorkoutAction(sessionId: string): Promise<ActionResult> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  // Hacmi istemciden almıyoruz; kaydedilmiş setlerden sunucuda hesaplıyoruz.
+  // Aksi halde kullanıcı toplam hacmini istediği gibi şişirebilirdi.
+  const { data: sets, error: setsError } = await supabase
+    .from("set_logs")
+    .select("weight, reps")
+    .eq("session_id", sessionId);
+
+  if (setsError) return dbFail("finishWorkout.sets", setsError);
+
+  // Kayan nokta gürültüsü birikmesin diye iki ondalığa sabitliyoruz.
+  const rawVolume = (sets ?? []).reduce(
+    (sum, set) => sum + Number(set.weight ?? 0) * Number(set.reps ?? 0),
+    0
   );
-
-  const { error } = await supabase
-    .from("workout_sessions")
-    .update({ 
-      end_time: new Date().toISOString(),
-      total_volume: totalVolume 
-    })
-    .eq("id", sessionId);
-
-  if (error) return { error: error.message };
-
-  // DÜZELTME: İdman bitince anında Dashboard'un güncellenmesi için düzeltildi
-  revalidatePath("/dashboard"); 
-  return { success: true };
-}
-
-// 5. Kayıtlı Tüm Rutinleri Getir
-export async function getRoutinesAction() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
-  );
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Oturum bulunamadı." };
-
-  const { data, error } = await supabase
-    .from("routines")
-    .select("*")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false });
-
-  if (error) return { error: error.message };
-  return { routines: data };
-}
-
-// 6. Haftalık Toplam Hacmi Hesapla
-export async function getWeeklyVolumeAction() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
-  );
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { volume: 0 };
-
-  // Son 7 günün başlangıcını bul
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const totalVolume = Math.round(rawVolume * 100) / 100;
 
   const { data, error } = await supabase
     .from("workout_sessions")
-    .select("total_volume")
+    .update({ end_time: new Date().toISOString(), total_volume: totalVolume })
+    .eq("id", sessionId)
     .eq("user_id", user.id)
-    .gte("start_time", sevenDaysAgo.toISOString()) // DÜZELTME: Tablondaki sütun adıyla (start_time) eşleştirildi!
-    .not("end_time", "is", null);
+    .select("id")
+    .maybeSingle();
 
-  if (error || !data) return { volume: 0 };
+  if (error) return dbFail("finishWorkout.update", error);
+  if (!data) return fail("Bu antrenmana erişim yetkin yok.");
 
-  const total = data.reduce((acc, curr) => acc + (Number(curr.total_volume) || 0), 0);
-  return { volume: total };
+  revalidatePath("/dashboard");
+  revalidatePath("/history");
+  return ok(null);
 }
 
-// 7. Belirli Bir Rutinin Egzersizlerini Getir
-export async function getRoutineExercisesAction(routineId: string) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
-  );
+// ==========================================
+// Rutin silme
+// ==========================================
+export async function deleteRoutineAction(routineId: string): Promise<ActionResult> {
+  const user = await requireUser();
+  const supabase = await createClient();
 
-  const { data, error } = await supabase
-    .from("routine_exercises")
-    .select("*")
-    .eq("routine_id", routineId)
-    .order("order_index", { ascending: true });
-
-  if (error) return { error: error.message };
-  return { exercises: data };
-}
-
-// 8. İdman Geçmişini Getir
-export async function getWorkoutHistoryAction() {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
-  );
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Session not found." };
-
-  const { data, error } = await supabase
-    .from("workout_sessions")
-    .select("*")
-    .eq("user_id", user.id)
-    .not("end_time", "is", null)
-    .order("end_time", { ascending: false });
-
-  if (error) return { error: error.message };
-  return { history: data };
-}
-
-// 9. AI Tavsiyesini Kaydet
-export async function saveAIWorkout(advice: string) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
-  );
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "User not found" };
-
-  // DÜZELTME: Sondaki yazım/format hatası toparlandı
-  const { error } = await supabase
-    .from("workouts")
-    .insert([{ user_id: user.id, ai_advice: advice }]);
-
-  if (error) return { error: error.message };
-  return { success: true };
-}
-
-export async function deleteRoutineAction(routineId: string) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get(name: string) { return cookieStore.get(name)?.value } } }
-  );
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Unauthorized" };
-
-  // Rutini siliyoruz. 
-  // NOT: Supabase'de Foreign Key ayarlarında "ON DELETE CASCADE" açıksa 
-  // ona bağlı egzersizler otomatik silinir.
   const { error } = await supabase
     .from("routines")
     .delete()
     .eq("id", routineId)
-    .eq("user_id", user.id); // Güvenlik: Sadece kendi rutinini silebilir
+    .eq("user_id", user.id);
 
-  if (error) return { error: error.message };
+  if (error) return dbFail("deleteRoutine", error);
 
   revalidatePath("/dashboard");
-  return { success: true };
+  return ok(null);
+}
+
+// ==========================================
+// Şablondan program oluşturma
+// Şablon kullanıcının hesabına kopyalanır; sonrasında sahibi odur ve
+// istediği gibi düzenleyebilir.
+// ==========================================
+export async function createRoutinesFromTemplateAction(
+  templateId: string
+): Promise<ActionResult<{ created: number }>> {
+  const user = await requireUser();
+
+  const template = findTemplate(templateId);
+  if (!template) return fail("Şablon bulunamadı.");
+
+  const supabase = await createClient();
+
+  const { data: routines, error: routineError } = await supabase
+    .from("routines")
+    .insert(template.routines.map((routine) => ({ user_id: user.id, name: routine.name })))
+    .select("id, name");
+
+  if (routineError || !routines) {
+    return routineError
+      ? dbFail("createFromTemplate", routineError)
+      : fail("Program oluşturulamadı.");
+  }
+
+  // Dönen satırların sırasına güvenmiyoruz; ada göre eşliyoruz.
+  const idByName = new Map(routines.map((row) => [row.name as string, row.id as string]));
+
+  const exerciseRows = template.routines.flatMap((routine) => {
+    const routineId = idByName.get(routine.name);
+    if (!routineId) return [];
+    return routine.exercises.map((exercise, index) => ({
+      routine_id: routineId,
+      exercise_name: exercise.name,
+      default_sets: exercise.sets,
+      default_reps: exercise.reps,
+      order_index: index,
+    }));
+  });
+
+  const { error: exerciseError } = await supabase
+    .from("routine_exercises")
+    .insert(exerciseRows);
+
+  if (exerciseError) {
+    // Yarım program bırakmıyoruz.
+    await supabase
+      .from("routines")
+      .delete()
+      .in("id", [...idByName.values()])
+      .eq("user_id", user.id);
+    return dbFail("createFromTemplate.exercises", exerciseError);
+  }
+
+  revalidatePath("/dashboard");
+  return ok({ created: routines.length });
+}
+
+// ==========================================
+// Ayarlamalar
+// ==========================================
+
+/**
+ * AI'ın önerdiği ayarlamaları kaydeder.
+ * Öneriler buraya gelmeden önce validateAdjustments'tan geçmiş olmalıdır;
+ * burada ikinci kez doğrulanırlar çünkü bu bir public endpoint.
+ */
+export async function saveAdjustmentsAction(
+  adjustments: Adjustment[]
+): Promise<ActionResult<{ saved: number }>> {
+  const user = await requireUser();
+
+  if (adjustments.length === 0) return ok({ saved: 0 });
+  if (adjustments.length > 20) return fail("Çok fazla ayarlama.");
+
+  // İstemciden gelen veriye güvenmiyoruz: kullanıcının gerçek egzersizlerine
+  // ve katalog kas gruplarına karşı yeniden doğruluyoruz.
+  const userExercises = await getUserExerciseNames();
+  const validated = validateAdjustments(
+    adjustments.map((a) => ({
+      exercise: a.exerciseName,
+      action: a.action,
+      substitute: a.substituteName ?? undefined,
+      reason: a.reason,
+    })),
+    userExercises
+  );
+
+  if (validated.length === 0) return fail("Geçerli bir ayarlama bulunamadı.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("exercise_adjustments").upsert(
+    validated.map((a) => ({
+      user_id: user.id,
+      exercise_key: a.exerciseKey,
+      exercise_name: a.exerciseName,
+      action: a.action,
+      substitute_name: a.substituteName,
+      reason: a.reason,
+      expires_at: a.expiresAt,
+    })),
+    { onConflict: "user_id,exercise_key" }
+  );
+
+  if (error) return dbFail("saveAdjustments", error);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/coach");
+  return ok({ saved: validated.length });
+}
+
+/** Tek bir ayarlamayı kaldırır. Kullanıcı kontrolü her zaman AI'ın üstünde. */
+export async function dismissAdjustmentAction(
+  exerciseKey: string
+): Promise<ActionResult> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("exercise_adjustments")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("exercise_key", exerciseKey);
+
+  if (error) return dbFail("dismissAdjustment", error);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/coach");
+  return ok(null);
 }

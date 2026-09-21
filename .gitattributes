@@ -1,0 +1,10 @@
+# Depoda her şey LF olarak saklanır; checkout'ta platforma bırakılır.
+# Bunu eklemeden önce 13 dosya sırf CRLF/LF farkı yüzünden "değişmiş" görünüyordu.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
