@@ -1,10 +1,10 @@
 "use client";
 
-import { useId, useMemo, useState, useTransition } from "react";
+import { useId, useMemo, useState } from "react";
 import { Check, Search, Plus } from "lucide-react";
 
-import { searchExercises, findExercise, type MuscleGroup } from "@/lib/exercises";
-import { createCustomExerciseAction } from "@/app/actions/workoutActions";
+import { searchExercises, findExercise } from "@/lib/exercises";
+import ExerciseClassifier from "@/components/routines/ExerciseClassifier";
 
 interface Props {
   value: string;
@@ -13,8 +13,6 @@ interface Props {
   customKeys?: string[];
   placeholder?: string;
 }
-
-const GROUPS: MuscleGroup[] = ["göğüs", "sırt", "omuz", "kol", "bacak", "karın"];
 
 export default function ExercisePicker({
   value,
@@ -25,10 +23,6 @@ export default function ExercisePicker({
   const [isOpen, setIsOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [draftName, setDraftName] = useState<string | null>(null);
-  const [group, setGroup] = useState<MuscleGroup | null>(null);
-  const [increment, setIncrement] = useState<2.5 | 5>(2.5);
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
 
   const listId = useId();
   const optionId = (i: number) => `${listId}-option-${i}`;
@@ -48,24 +42,7 @@ export default function ExercisePicker({
 
   const openClassifier = () => {
     setDraftName(value.trim());
-    setGroup(null);
-    setIncrement(2.5);
-    setError(null);
     setIsOpen(false);
-  };
-
-  const saveCustom = () => {
-    if (!draftName || !group) return;
-    setError(null);
-    startTransition(async () => {
-      const result = await createCustomExerciseAction(draftName, group, increment);
-      if (result.ok) {
-        onChange(result.data.name);
-        setDraftName(null);
-      } else {
-        setError(result.error);
-      }
-    });
   };
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -97,77 +74,14 @@ export default function ExercisePicker({
   // -------------------------------------------------------- sınıflandırma
   if (draftName) {
     return (
-      <div className="rounded-2xl border border-blue-500/30 bg-blue-600/10 p-4">
-        <p className="mb-1 text-[10px] font-black uppercase tracking-widest text-blue-400">
-          Yeni hareket
-        </p>
-        <p className="mb-4 text-lg font-bold">{draftName}</p>
-
-        {/* Sınıflandırma zorunlu: kas grubu bilinmeyen hareket doğru artış
-            adımı alamaz ve AI ona ikame öneremez. */}
-        <p className="mb-2 text-xs font-bold text-slate-400">Hangi kas grubu?</p>
-        <div className="mb-4 flex flex-wrap gap-2">
-          {GROUPS.map((g) => (
-            <button
-              key={g}
-              type="button"
-              onClick={() => {
-                setGroup(g);
-                // Bacak bileşik hareketleri genelde daha hızlı ilerler.
-                setIncrement(g === "bacak" ? 5 : 2.5);
-              }}
-              className={`min-h-11 rounded-xl px-4 text-sm font-bold capitalize transition-colors ${
-                group === g ? "bg-blue-600 text-white" : "bg-white/5 text-slate-300"
-              }`}
-            >
-              {g}
-            </button>
-          ))}
-        </div>
-
-        <p className="mb-2 text-xs font-bold text-slate-400">
-          Her ilerlemede ne kadar eklensin?
-        </p>
-        <div className="mb-4 flex gap-2">
-          {([2.5, 5] as const).map((step) => (
-            <button
-              key={step}
-              type="button"
-              onClick={() => setIncrement(step)}
-              className={`min-h-11 flex-1 rounded-xl px-4 text-sm font-bold transition-colors ${
-                increment === step ? "bg-blue-600 text-white" : "bg-white/5 text-slate-300"
-              }`}
-            >
-              +{step} kg
-            </button>
-          ))}
-        </div>
-
-        {error && (
-          <p role="alert" className="mb-3 text-sm font-medium text-red-400">
-            {error}
-          </p>
-        )}
-
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setDraftName(null)}
-            disabled={isPending}
-            className="min-h-11 flex-1 rounded-xl border border-white/10 text-sm font-bold text-slate-300 disabled:opacity-50"
-          >
-            Vazgeç
-          </button>
-          <button
-            type="button"
-            onClick={saveCustom}
-            disabled={isPending || !group}
-            className="min-h-11 flex-[2] rounded-xl bg-blue-600 text-sm font-black disabled:opacity-40"
-          >
-            {isPending ? "Ekleniyor..." : "Ekle"}
-          </button>
-        </div>
-      </div>
+      <ExerciseClassifier
+        name={draftName}
+        onDone={(savedName) => {
+          onChange(savedName);
+          setDraftName(null);
+        }}
+        onCancel={() => setDraftName(null)}
+      />
     );
   }
 

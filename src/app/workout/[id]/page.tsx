@@ -54,6 +54,7 @@ export default async function WorkoutPage({
       originalName: exercise.exercise_name,
       performedName: adjusted.displayName,
       targetSets: exercise.default_sets,
+      classified: resolve(exercise.exercise_name) !== undefined,
       prescription: adjusted,
     };
   });

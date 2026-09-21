@@ -2,6 +2,11 @@
 -- VERİ TEMİZLİĞİ — TEK SEFERLİK, GERİ ALINAMAZ
 --
 -- Bu bir migration DEĞİLDİR. Şema değiştirmez, VERİ SİLER.
+--
+-- ÇALIŞTIRMAK ZORUNDA DEĞİLSİN. Eski sınıflandırılmamış hareketler artık
+-- antrenman planı ekranından düzeltilebiliyor ("Bu hareket sınıflandırılmamış
+-- — kas grubunu seç"), yani veriyi silmeden de temiz duruma geçebilirsin.
+-- Bu script yalnızca gerçekten sıfırdan başlamak istersen var.
 -- Geliştirme sırasında birikmiş test kayıtlarını (AAA, BBB, sınır dışı
 -- ağırlıklar, sınıflandırılmamış hareketler) temizlemek için yazıldı.
 --

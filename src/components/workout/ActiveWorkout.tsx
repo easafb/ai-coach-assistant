@@ -10,6 +10,7 @@ import {
   TrendingUp,
   ArrowLeftRight,
   Ban,
+  HelpCircle,
 } from "lucide-react";
 
 import {
@@ -19,6 +20,7 @@ import {
 } from "@/app/actions/workoutActions";
 import type { ProgressionDecision } from "@/lib/progression";
 import type { WorkoutPlanItem } from "@/lib/adjustments";
+import ExerciseClassifier from "@/components/routines/ExerciseClassifier";
 
 interface Props {
   routineId: string;
@@ -53,6 +55,7 @@ export default function ActiveWorkout({ routineId, plan }: Props) {
   const [reps, setReps] = useState("");
   const [setsByExercise, setSetsByExercise] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
+  const [classifying, setClassifying] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const hasStarted = sessionId !== null;
@@ -178,6 +181,30 @@ export default function ActiveWorkout({ routineId, plan }: Props) {
                   <span className="text-neutral-600"> × </span>
                   {item.targetSets} × {item.prescription.reps}
                 </p>
+
+                {/* Sınıflandırılmamış hareket: artış adımı tahmine düşüyor ve
+                    AI ikame öneremiyor. Kullanıcıya düzeltme yolu sunuyoruz. */}
+                {!item.classified &&
+                  (classifying === item.originalName ? (
+                    <div className="mt-3">
+                      <ExerciseClassifier
+                        name={item.originalName}
+                        onDone={() => {
+                          setClassifying(null);
+                          router.refresh();
+                        }}
+                        onCancel={() => setClassifying(null)}
+                      />
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setClassifying(item.originalName)}
+                      className="mt-3 flex min-h-11 w-full items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 text-left text-xs font-bold text-amber-400"
+                    >
+                      <HelpCircle size={14} className="shrink-0" />
+                      Bu hareket sınıflandırılmamış — kas grubunu seç
+                    </button>
+                  ))}
               </li>
             ))}
 

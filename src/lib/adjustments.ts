@@ -186,5 +186,10 @@ export interface WorkoutPlanItem {
   /** Fiilen yapılacak hareket (swap sonrası değişmiş olabilir). */
   performedName: string;
   targetSets: number;
+  /**
+   * Hareket katalogda ya da kullanıcının kendi kayıtlarında tanımlı mı?
+   * Değilse artış adımı tahmine düşüyor ve AI ona ikame öneremiyor.
+   */
+  classified: boolean;
   prescription: AdjustedPrescription;
 }
