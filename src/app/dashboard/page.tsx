@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Dumbbell } from "lucide-react";
+import { Plus, Dumbbell, LayoutGrid } from "lucide-react";
 
 import { requireUser, displayName } from "@/lib/dal";
 import { getRoutines, getWeeklyVolume } from "@/lib/queries";
@@ -29,13 +29,22 @@ export default async function DashboardPage() {
               Hedeflerine bir adım daha yaklaşmak için harika bir gün. 🦾
             </p>
           </div>
-          <Link
-            href="/routines/new"
-            className="flex items-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 font-bold text-white shadow-lg shadow-blue-900/20 transition-all hover:scale-105 hover:bg-blue-500 active:scale-95"
-          >
-            <Plus size={20} />
-            Yeni Rutin
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/routines/templates"
+              className="flex min-h-12 items-center gap-2 rounded-2xl border border-neutral-800 bg-neutral-900 px-5 py-3 font-bold text-slate-300 transition-all hover:border-neutral-700 hover:text-white active:scale-95"
+            >
+              <LayoutGrid size={18} />
+              Hazır Programlar
+            </Link>
+            <Link
+              href="/routines/new"
+              className="flex min-h-12 items-center gap-2 rounded-2xl bg-blue-600 px-6 py-3 font-bold text-white shadow-lg shadow-blue-900/20 transition-all hover:scale-105 hover:bg-blue-500 active:scale-95"
+            >
+              <Plus size={20} />
+              Yeni Rutin
+            </Link>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
