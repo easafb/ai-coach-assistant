@@ -1,28 +1,97 @@
 "use server";
 
 import { requireUser } from "@/lib/dal";
+import { getUserExerciseNames } from "@/lib/queries";
+import { validateAdjustments, type Adjustment, type RawAdjustment } from "@/lib/adjustments";
+import { EXERCISE_CATALOG } from "@/lib/exercises";
 import type { ActionResult } from "@/types";
 
 const MODEL = "gemini-2.5-flash-lite";
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
-const FALLBACK =
-  "Coach.ai şu an yanıt veremiyor. Formuna odaklan ve güvenli çalış — birazdan tekrar dene.";
+const FALLBACK = "Coach.ai şu an yanıt veremiyor. Birazdan tekrar dene.";
 
-interface CoachAdvice {
-  advice: string;
+export interface CoachPlan {
+  summary: string;
+  adjustments: Adjustment[];
+  seekMedicalAttention: boolean;
 }
 
-export async function getCoachAdvice(
+const SYSTEM_INSTRUCTION = `Sen Coach.ai adlı profesyonel bir fitness asistanısın.
+
+Kullanıcı sana nasıl hissettiğini anlatır (ağrı, bitkinlik, uyku, stres).
+Görevin, onun antrenman programında HANGİ HAREKETLERİN nasıl değişmesi
+gerektiğine karar vermek.
+
+Kurallar:
+- Yalnızca sana verilen egzersiz listesindeki hareketleri kullan. Listede
+  olmayan bir hareket adı uydurma.
+- Her hareket için üç eylemden birini seç:
+  * "reduce_load" — hareket yapılabilir ama yük hafifletilmeli
+  * "swap" — hareket ağrıyı tetikliyor, aynı kas grubundan başka bir
+    hareketle değiştirilmeli
+  * "skip" — bu hareket bugün hiç yapılmamalı
+- "swap" seçersen "substitute" alanına sana verilen katalogdan AYNI kas
+  grubundaki bir hareket yaz.
+- ASLA ağırlık, kilo, set veya tekrar sayısı belirtme. Bunları sistem hesaplar.
+- Sadece gerçekten etkilenen hareketleri listele. Şikayetle ilgisi olmayan
+  hareketlere dokunma; boş liste döndürmek tamamen geçerli bir yanıttır.
+- Tıbbi teşhis koyma. Keskin/yayılan ağrı, uyuşma, şişlik veya travma
+  tarif edilirse "seekMedicalAttention" değerini true yap.
+- "summary" alanına kullanıcıya hitaben Türkçe, iki cümleyi geçmeyen bir
+  açıklama yaz.`;
+
+const RESPONSE_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    summary: { type: "STRING" },
+    seekMedicalAttention: { type: "BOOLEAN" },
+    adjustments: {
+      type: "ARRAY",
+      items: {
+        type: "OBJECT",
+        properties: {
+          exercise: { type: "STRING" },
+          action: { type: "STRING", enum: ["reduce_load", "swap", "skip"] },
+          substitute: { type: "STRING" },
+          reason: { type: "STRING" },
+        },
+        required: ["exercise", "action", "reason"],
+      },
+    },
+  },
+  required: ["summary", "adjustments", "seekMedicalAttention"],
+} as const;
+
+/**
+ * Kullanıcının bildirdiği duruma göre programda yapılacak ayarlamaları üretir.
+ *
+ * Modelin çıktısına güvenilmez: dönen her öneri kullanıcının gerçek
+ * egzersizlerine ve katalog kas gruplarına karşı doğrulanır
+ * (lib/adjustments.validateAdjustments). Model sayı üretemez; hafifletme
+ * oranı kodda sabittir.
+ */
+export async function requestCoachPlan(
   feedback: string
-): Promise<ActionResult<CoachAdvice>> {
-  // Bu bir Server Action, yani public bir endpoint. Eski halinde hiç auth
-  // kontrolü yoktu; oturumu olmayan biri Gemini kotasını sınırsız harcayabilirdi.
+): Promise<ActionResult<CoachPlan>> {
+  // Bu bir Server Action, yani public endpoint. Auth kontrolü zorunlu.
   await requireUser();
 
   const trimmed = feedback.trim();
-  if (trimmed.length < 3) return { ok: false, error: "Lütfen durumunu biraz anlat." };
-  if (trimmed.length > 1000) return { ok: false, error: "Mesaj çok uzun." };
+  if (trimmed.length < 10) {
+    return { ok: false, error: "Durumunu biraz daha ayrıntılı anlat." };
+  }
+  if (trimmed.length > 1000) {
+    return { ok: false, error: "Mesaj çok uzun." };
+  }
+
+  const userExercises = await getUserExerciseNames();
+  if (userExercises.length === 0) {
+    return {
+      ok: false,
+      error: "Önce bir rutin oluştur; ayarlama yapabilmem için programını görmem gerekiyor.",
+    };
+  }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
@@ -30,38 +99,46 @@ export async function getCoachAdvice(
     return { ok: false, error: FALLBACK };
   }
 
+  // Katalogdan yalnızca kas grubu bilgisini veriyoruz: model ikameyi
+  // doğru gruptan seçebilsin diye.
+  const catalogByGroup = EXERCISE_CATALOG.reduce<Record<string, string[]>>(
+    (acc, exercise) => {
+      (acc[exercise.group] ??= []).push(exercise.name);
+      return acc;
+    },
+    {}
+  );
+
   try {
     const response = await fetch(ENDPOINT, {
       method: "POST",
       cache: "no-store",
       headers: {
         "Content-Type": "application/json",
-        // Anahtarı URL yerine header'da yolluyoruz: URL'ler loglara ve
-        // proxy kayıtlarına düşer, header'lar genelde düşmez.
         "x-goog-api-key": apiKey,
       },
       body: JSON.stringify({
-        systemInstruction: {
-          parts: [
-            {
-              text:
-                "Sen Coach.ai adlı profesyonel bir fitness asistanısın. " +
-                "Türkçe, tek cümlelik, somut ve uygulanabilir tavsiye ver. " +
-                "Tıbbi teşhis koyma; ciddi ağrı tarif edilirse kullanıcıyı bir " +
-                "sağlık profesyoneline yönlendir.",
-            },
-          ],
-        },
-        contents: [{ role: "user", parts: [{ text: trimmed }] }],
-        // Yapılandırılmış çıktı: modelin JSON döndüreceğini garantiliyor.
-        // Eski koddaki ```json fence'lerini regex ile temizleme hack'i böylece gereksizleşiyor.
+        systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: [
+                  `Kullanıcının programındaki hareketler: ${userExercises.join(", ")}`,
+                  "",
+                  `İkame seçebileceğin katalog (kas grubuna göre): ${JSON.stringify(catalogByGroup)}`,
+                  "",
+                  `Kullanıcının bildirdiği durum: "${trimmed}"`,
+                ].join("\n"),
+              },
+            ],
+          },
+        ],
         generationConfig: {
           responseMimeType: "application/json",
-          responseSchema: {
-            type: "OBJECT",
-            properties: { advice: { type: "STRING" } },
-            required: ["advice"],
-          },
+          responseSchema: RESPONSE_SCHEMA,
+          temperature: 0.4,
         },
       }),
     });
@@ -70,25 +147,40 @@ export async function getCoachAdvice(
       if (response.status === 429 || response.status === 503) {
         return { ok: false, error: "Coach.ai şu an yoğun. Birkaç saniye sonra dene." };
       }
-      // Sağlayıcı yanıtının tamamını loglamıyoruz; kullanıcı verisi içerebilir.
       console.error(`Gemini isteği başarısız: ${response.status}`);
       return { ok: false, error: FALLBACK };
     }
 
     const data = await response.json();
-    const text: unknown =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text;
-
+    const text: unknown = data?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (typeof text !== "string") return { ok: false, error: FALLBACK };
 
-    const parsed = JSON.parse(text) as Partial<CoachAdvice>;
-    if (typeof parsed.advice !== "string" || !parsed.advice.trim()) {
-      return { ok: false, error: FALLBACK };
-    }
+    const parsed = JSON.parse(text) as {
+      summary?: unknown;
+      adjustments?: unknown;
+      seekMedicalAttention?: unknown;
+    };
 
-    return { ok: true, data: { advice: parsed.advice.trim() } };
+    const rawAdjustments: RawAdjustment[] = Array.isArray(parsed.adjustments)
+      ? (parsed.adjustments as RawAdjustment[])
+      : [];
+
+    return {
+      ok: true,
+      data: {
+        summary:
+          typeof parsed.summary === "string" && parsed.summary.trim()
+            ? parsed.summary.trim().slice(0, 400)
+            : "Programını gözden geçirdim.",
+        adjustments: validateAdjustments(rawAdjustments, userExercises),
+        seekMedicalAttention: parsed.seekMedicalAttention === true,
+      },
+    };
   } catch (error) {
-    console.error("Coach.ai servis hatası:", error instanceof Error ? error.message : error);
+    console.error(
+      "Coach.ai servis hatası:",
+      error instanceof Error ? error.message : error
+    );
     return { ok: false, error: FALLBACK };
   }
 }

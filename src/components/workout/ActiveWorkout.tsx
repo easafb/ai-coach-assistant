@@ -1,21 +1,28 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, ChevronRight, Dumbbell, Play, TrendingUp } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronRight,
+  Dumbbell,
+  Play,
+  TrendingUp,
+  ArrowLeftRight,
+  Ban,
+} from "lucide-react";
 
 import {
   startWorkoutAction,
   logSetAction,
   finishWorkoutAction,
 } from "@/app/actions/workoutActions";
-import type { RoutineExercise } from "@/types";
-import type { Prescription, ProgressionDecision } from "@/lib/progression";
+import type { ProgressionDecision } from "@/lib/progression";
+import type { WorkoutPlanItem } from "@/lib/adjustments";
 
 interface Props {
   routineId: string;
-  exercises: RoutineExercise[];
-  prescriptions: Record<string, Prescription>;
+  plan: WorkoutPlanItem[];
 }
 
 const DECISION_LABEL: Record<ProgressionDecision, string> = {
@@ -32,21 +39,22 @@ const DECISION_STYLE: Record<ProgressionDecision, string> = {
   deload: "bg-orange-100 text-orange-700",
 };
 
-export default function ActiveWorkout({ routineId, exercises, prescriptions }: Props) {
+export default function ActiveWorkout({ routineId, plan }: Props) {
   const router = useRouter();
+
+  // Atlanan hareketler seansın dışında; plan ekranında yine de gösteriliyorlar.
+  const active = plan.filter((item) => !item.prescription.skipped);
+  const skipped = plan.filter((item) => item.prescription.skipped);
 
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [index, setIndex] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
-  // Set sayısını egzersiz bazında tutuyoruz. Tek bir toplam sayaç, kullanıcıya
-  // "bu egzersizde kaçtayım" sorusunun cevabını vermiyordu.
   const [setsByExercise, setSetsByExercise] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  // Oturum yalnızca kullanıcı "Başlat"a bastığında açılıyor.
   const hasStarted = sessionId !== null;
 
   useEffect(() => {
@@ -57,21 +65,18 @@ export default function ActiveWorkout({ routineId, exercises, prescriptions }: P
 
   const weightInput = useRef<HTMLInputElement>(null);
 
-  // Egzersize geçişte alanları reçeteyle dolduruyoruz: kullanıcının salonda
-  // "bugün kaç kilo?" diye düşünmesi gereken tek an bu, ve cevabı hazır geliyor.
-  // Bunu effect ile senkronlamak yerine index'in fiilen değiştiği yerde yapıyoruz;
-  // effect içinde setState ardışık render tetikler.
-  const goToExercise = useCallback(
-    (exerciseIndex: number) => {
-      const clamped = Math.max(0, Math.min(exercises.length - 1, exerciseIndex));
-      const prescription = prescriptions[exercises[clamped].id];
-      setIndex(clamped);
-      setWeight(prescription?.weight != null ? String(prescription.weight) : "");
-      setReps(prescription ? String(prescription.reps) : "");
-      setError(null);
-    },
-    [exercises, prescriptions]
-  );
+  // Egzersize geçişte alanları reçeteyle dolduruyoruz; effect yerine index'in
+  // fiilen değiştiği yerde yapıyoruz ki ardışık render tetiklenmesin.
+  // useCallback bilerek yok: React Compiler memoizasyonu kendisi hallediyor,
+  // elle sarmalamak derleyicinin optimizasyonu atlamasına yol açıyordu.
+  const goToExercise = (nextIndex: number) => {
+    const clamped = Math.max(0, Math.min(active.length - 1, nextIndex));
+    const item = active[clamped];
+    setIndex(clamped);
+    setWeight(item?.prescription.weight != null ? String(item.prescription.weight) : "");
+    setReps(item ? String(item.prescription.reps) : "");
+    setError(null);
+  };
 
   const formatTime = (total: number) =>
     `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
@@ -102,21 +107,19 @@ export default function ActiveWorkout({ routineId, exercises, prescriptions }: P
 
     setError(null);
     startTransition(async () => {
+      // Fiilen yapılan hareketi logluyoruz: swap varsa ikamenin adı gider,
+      // böylece geçmiş gerçekte yapılanı yansıtır.
       const result = await logSetAction(
         sessionId,
-        exercises[index].exercise_name,
+        active[index].performedName,
         weightNum,
         repsNum
       );
 
       if (result.ok) {
-        const exerciseId = exercises[index].id;
-        setSetsByExercise((prev) => ({
-          ...prev,
-          [exerciseId]: (prev[exerciseId] ?? 0) + 1,
-        }));
-        // Ağırlık aynı kalıyor, tekrar hedefe dönüyor: sıradaki set tek dokunuş.
-        setReps(String(prescriptions[exerciseId]?.reps ?? ""));
+        const id = active[index].exerciseId;
+        setSetsByExercise((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
+        setReps(String(active[index].prescription.reps));
         weightInput.current?.focus();
       } else {
         setError(result.error);
@@ -146,31 +149,59 @@ export default function ActiveWorkout({ routineId, exercises, prescriptions }: P
           </p>
 
           <ul className="mb-8 space-y-3">
-            {exercises.map((exercise) => {
-              const prescription = prescriptions[exercise.id];
-              return (
-                <li
-                  key={exercise.id}
-                  className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="font-bold">{exercise.exercise_name}</span>
-                    <span
-                      className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ${
-                        DECISION_STYLE[prescription.decision]
-                      }`}
-                    >
-                      {DECISION_LABEL[prescription.decision]}
-                    </span>
-                  </div>
-                  <p className="mt-1 font-mono text-lg font-bold text-blue-400">
-                    {prescription.weight != null ? `${prescription.weight} kg` : "— kg"}
-                    <span className="text-neutral-600"> × </span>
-                    {exercise.default_sets} × {prescription.reps}
+            {active.map((item) => (
+              <li
+                key={item.exerciseId}
+                className="rounded-2xl border border-neutral-800 bg-neutral-900/50 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <span className="font-bold">
+                    {item.performedName}
+                    {item.prescription.adjustment?.action === "swap" && (
+                      <span className="ml-2 inline-flex items-center gap-1 text-[10px] font-black uppercase text-amber-500">
+                        <ArrowLeftRight size={11} /> {item.originalName} yerine
+                      </span>
+                    )}
+                  </span>
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase ${
+                      DECISION_STYLE[item.prescription.decision]
+                    }`}
+                  >
+                    {DECISION_LABEL[item.prescription.decision]}
+                  </span>
+                </div>
+                <p className="mt-1 font-mono text-lg font-bold text-blue-400">
+                  {item.prescription.weight != null
+                    ? `${item.prescription.weight} kg`
+                    : "— kg"}
+                  <span className="text-neutral-600"> × </span>
+                  {item.targetSets} × {item.prescription.reps}
+                </p>
+              </li>
+            ))}
+
+            {skipped.map((item) => (
+              <li
+                key={item.exerciseId}
+                className="flex items-start gap-3 rounded-2xl border border-neutral-900 bg-neutral-900/20 p-4 opacity-60"
+              >
+                <Ban size={16} className="mt-1 shrink-0 text-amber-500" />
+                <div>
+                  <p className="font-bold line-through decoration-neutral-600">
+                    {item.originalName}
                   </p>
-                </li>
-              );
-            })}
+                  <p className="text-[10px] font-black uppercase tracking-wider text-amber-500">
+                    Bugün atlanıyor
+                  </p>
+                  {item.prescription.adjustment && (
+                    <p className="mt-1 text-sm text-neutral-500">
+                      {item.prescription.adjustment.reason}
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
           </ul>
 
           {error && (
@@ -179,28 +210,32 @@ export default function ActiveWorkout({ routineId, exercises, prescriptions }: P
             </p>
           )}
 
-          <button
-            onClick={handleStart}
-            disabled={isPending}
-            className="flex w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-5 text-lg font-black disabled:opacity-50"
-          >
-            <Play size={20} fill="currentColor" />
-            {isPending ? "Başlatılıyor..." : "Antrenmanı Başlat"}
-          </button>
+          {active.length === 0 ? (
+            <p className="rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-300">
+              Bu programdaki tüm hareketler şu an atlanıyor. Koç sayfasından
+              değişiklikleri kaldırabilirsin.
+            </p>
+          ) : (
+            <button
+              onClick={handleStart}
+              disabled={isPending}
+              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-5 text-lg font-black disabled:opacity-50"
+            >
+              <Play size={20} fill="currentColor" />
+              {isPending ? "Başlatılıyor..." : "Antrenmanı Başlat"}
+            </button>
+          )}
         </div>
       </main>
     );
   }
 
   // ------------------------------------------------------------------- aktif
-  const current = exercises[index];
-  const isLast = index === exercises.length - 1;
-  const prescription = prescriptions[current.id];
-  const doneSets = setsByExercise[current.id] ?? 0;
-  const targetSets = current.default_sets;
+  const current = active[index];
+  const isLast = index === active.length - 1;
+  const doneSets = setsByExercise[current.exerciseId] ?? 0;
+  const targetSets = current.targetSets;
   const totalSets = Object.values(setsByExercise).reduce((a, b) => a + b, 0);
-
-  // Hedefe ulaşınca otomatik geçmiyoruz: hedef bir plan, tavan değil.
   const targetReached = doneSets >= targetSets;
 
   return (
@@ -222,26 +257,30 @@ export default function ActiveWorkout({ routineId, exercises, prescriptions }: P
         <div className="mb-6 rounded-[2.5rem] bg-white p-8 text-black shadow-2xl">
           <div className="mb-6 flex items-start justify-between">
             <span className="rounded-full bg-blue-100 px-4 py-1 text-xs font-black uppercase text-blue-600">
-              Egzersiz {index + 1}/{exercises.length}
+              Egzersiz {index + 1}/{active.length}
             </span>
             <span
               className={`rounded-full px-3 py-1 text-[10px] font-black uppercase ${
-                DECISION_STYLE[prescription.decision]
+                DECISION_STYLE[current.prescription.decision]
               }`}
             >
-              {DECISION_LABEL[prescription.decision]}
+              {DECISION_LABEL[current.prescription.decision]}
             </span>
           </div>
 
-          <h1 className="mb-4 text-4xl font-black leading-tight">
-            {current.exercise_name}
+          <h1 className="mb-1 text-4xl font-black leading-tight">
+            {current.performedName}
           </h1>
+          {current.prescription.adjustment?.action === "swap" && (
+            <p className="mb-3 flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-amber-600">
+              <ArrowLeftRight size={12} /> {current.originalName} yerine
+            </p>
+          )}
 
-          {/* Kararın gerekçesi. Kullanıcının ödediği şey bu cümle. */}
-          <div className="mb-6 flex items-start gap-2 rounded-2xl bg-neutral-100 p-4">
+          <div className="mb-6 mt-4 flex items-start gap-2 rounded-2xl bg-neutral-100 p-4">
             <TrendingUp size={16} className="mt-0.5 shrink-0 text-blue-600" />
             <p className="text-sm font-medium leading-snug text-neutral-700">
-              {prescription.rationale}
+              {current.prescription.rationale}
             </p>
           </div>
 
@@ -317,7 +356,7 @@ export default function ActiveWorkout({ routineId, exercises, prescriptions }: P
           <button
             onClick={handleLogSet}
             disabled={isPending}
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-black py-5 text-lg font-black text-white transition-all hover:bg-neutral-800 active:scale-95 disabled:opacity-50"
+            className="mt-6 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-black py-5 text-lg font-black text-white transition-all hover:bg-neutral-800 active:scale-95 disabled:opacity-50"
           >
             <CheckCircle2 size={20} />
             {isPending
@@ -332,7 +371,7 @@ export default function ActiveWorkout({ routineId, exercises, prescriptions }: P
           <button
             onClick={() => goToExercise(index - 1)}
             disabled={index === 0}
-            className="flex-1 rounded-2xl border border-neutral-800 bg-neutral-900 py-4 font-bold disabled:opacity-40"
+            className="min-h-12 flex-1 rounded-2xl border border-neutral-800 bg-neutral-900 py-4 font-bold disabled:opacity-40"
           >
             Önceki
           </button>
@@ -341,14 +380,14 @@ export default function ActiveWorkout({ routineId, exercises, prescriptions }: P
             <button
               onClick={handleFinish}
               disabled={isPending}
-              className="flex-[2] rounded-2xl bg-red-600 py-4 font-bold shadow-lg shadow-red-900/20 disabled:opacity-50"
+              className="min-h-12 flex-[2] rounded-2xl bg-red-600 py-4 font-bold shadow-lg shadow-red-900/20 disabled:opacity-50"
             >
               Antrenmanı Bitir
             </button>
           ) : (
             <button
               onClick={() => goToExercise(index + 1)}
-              className={`flex flex-[2] items-center justify-center gap-2 rounded-2xl py-4 font-bold transition-all ${
+              className={`flex min-h-12 flex-[2] items-center justify-center gap-2 rounded-2xl py-4 font-bold transition-all ${
                 targetReached
                   ? "bg-emerald-500 text-white shadow-lg shadow-emerald-900/30 ring-2 ring-emerald-400/40"
                   : "bg-blue-600 shadow-lg shadow-blue-900/20"

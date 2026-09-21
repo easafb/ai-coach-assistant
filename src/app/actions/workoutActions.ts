@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/dal";
 import { findTemplate } from "@/lib/templates";
+import { validateAdjustments, type Adjustment } from "@/lib/adjustments";
+import { getUserExerciseNames } from "@/lib/queries";
 import type { ActionResult, ExerciseDraft } from "@/types";
 
 const ok = <T,>(data: T): ActionResult<T> => ({ ok: true, data });
@@ -268,4 +270,77 @@ export async function createRoutinesFromTemplateAction(
 
   revalidatePath("/dashboard");
   return ok({ created: routines.length });
+}
+
+// ==========================================
+// Ayarlamalar
+// ==========================================
+
+/**
+ * AI'ın önerdiği ayarlamaları kaydeder.
+ * Öneriler buraya gelmeden önce validateAdjustments'tan geçmiş olmalıdır;
+ * burada ikinci kez doğrulanırlar çünkü bu bir public endpoint.
+ */
+export async function saveAdjustmentsAction(
+  adjustments: Adjustment[]
+): Promise<ActionResult<{ saved: number }>> {
+  const user = await requireUser();
+
+  if (adjustments.length === 0) return ok({ saved: 0 });
+  if (adjustments.length > 20) return fail("Çok fazla ayarlama.");
+
+  // İstemciden gelen veriye güvenmiyoruz: kullanıcının gerçek egzersizlerine
+  // ve katalog kas gruplarına karşı yeniden doğruluyoruz.
+  const userExercises = await getUserExerciseNames();
+  const validated = validateAdjustments(
+    adjustments.map((a) => ({
+      exercise: a.exerciseName,
+      action: a.action,
+      substitute: a.substituteName ?? undefined,
+      reason: a.reason,
+    })),
+    userExercises
+  );
+
+  if (validated.length === 0) return fail("Geçerli bir ayarlama bulunamadı.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("exercise_adjustments").upsert(
+    validated.map((a) => ({
+      user_id: user.id,
+      exercise_key: a.exerciseKey,
+      exercise_name: a.exerciseName,
+      action: a.action,
+      substitute_name: a.substituteName,
+      reason: a.reason,
+      expires_at: a.expiresAt,
+    })),
+    { onConflict: "user_id,exercise_key" }
+  );
+
+  if (error) return dbFail("saveAdjustments", error);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/coach");
+  return ok({ saved: validated.length });
+}
+
+/** Tek bir ayarlamayı kaldırır. Kullanıcı kontrolü her zaman AI'ın üstünde. */
+export async function dismissAdjustmentAction(
+  exerciseKey: string
+): Promise<ActionResult> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { error } = await supabase
+    .from("exercise_adjustments")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("exercise_key", exerciseKey);
+
+  if (error) return dbFail("dismissAdjustment", error);
+
+  revalidatePath("/dashboard");
+  revalidatePath("/coach");
+  return ok(null);
 }

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/dal";
 import type { Routine, RoutineExercise, WorkoutSession } from "@/types";
 import { normalizeExerciseName, type ExercisePerformance } from "@/lib/progression";
+import type { Adjustment } from "@/lib/adjustments";
 
 // ==========================================
 // OKUMA KATMANI
@@ -172,4 +173,55 @@ export async function getExerciseHistory(
   }
 
   return result;
+}
+
+/** Kullanıcının rutinlerinde geçen benzersiz egzersiz adları. */
+export async function getUserExerciseNames(): Promise<string[]> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("routine_exercises")
+    .select("exercise_name, routines!inner(user_id)")
+    .eq("routines.user_id", user.id);
+
+  if (!data) return [];
+
+  // Aynı hareket birden fazla rutinde olabilir; kanonik yazımı koruyarak tekilleştiriyoruz.
+  const byKey = new Map<string, string>();
+  for (const row of data) {
+    const name = row.exercise_name as string;
+    const key = normalizeExerciseName(name);
+    if (!byKey.has(key)) byKey.set(key, name);
+  }
+
+  return [...byKey.values()];
+}
+
+/** Süresi dolmamış ayarlamalar, egzersiz anahtarına göre. */
+export async function getActiveAdjustments(): Promise<Record<string, Adjustment>> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("exercise_adjustments")
+    .select("exercise_key, exercise_name, action, substitute_name, reason, expires_at")
+    .eq("user_id", user.id)
+    .gt("expires_at", new Date().toISOString());
+
+  if (!data) return {};
+
+  return Object.fromEntries(
+    data.map((row) => [
+      row.exercise_key as string,
+      {
+        exerciseKey: row.exercise_key as string,
+        exerciseName: row.exercise_name as string,
+        action: row.action as Adjustment["action"],
+        substituteName: (row.substitute_name as string | null) ?? null,
+        reason: row.reason as string,
+        expiresAt: row.expires_at as string,
+      } satisfies Adjustment,
+    ])
+  );
 }
