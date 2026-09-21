@@ -110,6 +110,80 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   { name: "Hanging Leg Raise", group: "karın", type: "isolation", minStep: 2.5, aliases: ["leg raise", "bacak kaldırma"] },
   { name: "Cable Crunch", group: "karın", type: "isolation", minStep: 1.25, aliases: ["crunch", "mekik"] },
   { name: "Ab Wheel", group: "karın", type: "isolation", minStep: 2.5, aliases: ["ab roller", "karın tekeri"] },
+
+  // ------------------------------------------------- göğüs (ek)
+  { name: "Machine Chest Press", group: "göğüs", type: "compound", minStep: 2.5, aliases: ["makine göğüs", "chest press", "göğüs makinesi"] },
+  { name: "Smith Machine Bench Press", group: "göğüs", type: "compound", minStep: 2.5, aliases: ["smith bench", "smith göğüs"] },
+  { name: "Decline Dumbbell Press", group: "göğüs", type: "compound", minStep: 2.5, aliases: ["decline db", "alçalan dumbbell"] },
+  { name: "Dumbbell Fly", group: "göğüs", type: "isolation", minStep: 1.25, aliases: ["db fly", "halter fly"] },
+  { name: "Incline Cable Fly", group: "göğüs", type: "isolation", minStep: 1.25, aliases: ["eğimli kablo fly", "incline fly"] },
+  { name: "Low Cable Fly", group: "göğüs", type: "isolation", minStep: 1.25, aliases: ["alt kablo fly", "low fly"] },
+  { name: "Weighted Dips", group: "göğüs", type: "compound", minStep: 2.5, aliases: ["ağırlıklı dips", "weighted dip"] },
+  { name: "Incline Push Up", group: "göğüs", type: "compound", minStep: 2.5, aliases: ["eğimli şınav"] },
+
+  // -------------------------------------------------- sırt (ek)
+  { name: "Sumo Deadlift", group: "sırt", type: "compound", minStep: 5, aliases: ["sumo", "sumo ölü kaldırma"] },
+  { name: "Trap Bar Deadlift", group: "sırt", type: "compound", minStep: 5, aliases: ["trap bar", "hex bar"] },
+  { name: "Rack Pull", group: "sırt", type: "compound", minStep: 5, aliases: ["rack çekiş"] },
+  { name: "Chest Supported Row", group: "sırt", type: "compound", minStep: 2.5, aliases: ["göğüs destekli kürek", "chest supported"] },
+  { name: "Machine Row", group: "sırt", type: "compound", minStep: 2.5, aliases: ["makine kürek", "hammer row"] },
+  { name: "Reverse Grip Row", group: "sırt", type: "compound", minStep: 2.5, aliases: ["ters tutuş kürek", "underhand row"] },
+  { name: "Wide Grip Pull Up", group: "sırt", type: "compound", minStep: 2.5, aliases: ["geniş barfiks", "wide pullup"] },
+  { name: "Inverted Row", group: "sırt", type: "compound", minStep: 2.5, aliases: ["ters şınav", "australian pull up"] },
+  { name: "Single Arm Lat Pulldown", group: "sırt", type: "compound", minStep: 1.25, aliases: ["tek kol pulldown"] },
+  { name: "Straight Arm Pulldown", group: "sırt", type: "isolation", minStep: 1.25, aliases: ["düz kol pulldown", "straight arm"] },
+  { name: "Dumbbell Pullover", group: "sırt", type: "isolation", minStep: 1.25, aliases: ["pullover"] },
+  { name: "Dumbbell Shrug", group: "sırt", type: "isolation", minStep: 2.5, aliases: ["db shrug", "dambıl trapez"] },
+
+  // -------------------------------------------------- omuz (ek)
+  { name: "Machine Shoulder Press", group: "omuz", type: "compound", minStep: 2.5, aliases: ["makine omuz", "shoulder press machine"] },
+  { name: "Seated Dumbbell Press", group: "omuz", type: "compound", minStep: 2.5, aliases: ["oturarak omuz", "seated db press"] },
+  { name: "Push Press", group: "omuz", type: "compound", minStep: 2.5, aliases: ["itiş pres"] },
+  { name: "Landmine Press", group: "omuz", type: "compound", minStep: 2.5, aliases: ["landmine"] },
+  { name: "Cable Lateral Raise", group: "omuz", type: "isolation", minStep: 1.25, aliases: ["kablo yan omuz", "cable lateral"] },
+  { name: "Machine Lateral Raise", group: "omuz", type: "isolation", minStep: 1.25, aliases: ["makine yan omuz"] },
+  { name: "Reverse Pec Deck", group: "omuz", type: "isolation", minStep: 1.25, aliases: ["ters pec deck", "makine arka omuz"] },
+  { name: "Cable Rear Delt Fly", group: "omuz", type: "isolation", minStep: 1.25, aliases: ["kablo arka omuz"] },
+
+  // --------------------------------------------------- kol (ek)
+  { name: "EZ Bar Curl", group: "kol", type: "isolation", minStep: 1.25, aliases: ["ez curl", "z bar curl"] },
+  { name: "Incline Dumbbell Curl", group: "kol", type: "isolation", minStep: 1.25, aliases: ["eğimli curl", "incline curl"] },
+  { name: "Concentration Curl", group: "kol", type: "isolation", minStep: 1.25, aliases: ["konsantrasyon curl"] },
+  { name: "Spider Curl", group: "kol", type: "isolation", minStep: 1.25, aliases: ["örümcek curl"] },
+  { name: "Reverse Curl", group: "kol", type: "isolation", minStep: 1.25, aliases: ["ters curl"] },
+  { name: "Cable Hammer Curl", group: "kol", type: "isolation", minStep: 1.25, aliases: ["kablo çekiç"] },
+  { name: "Rope Pushdown", group: "kol", type: "isolation", minStep: 1.25, aliases: ["halat triceps", "rope triceps"] },
+  { name: "Triceps Kickback", group: "kol", type: "isolation", minStep: 1.25, aliases: ["kickback", "triceps geri itiş"] },
+  { name: "Bench Dips", group: "kol", type: "compound", minStep: 2.5, aliases: ["bench dip", "sehpa dips"] },
+  { name: "Diamond Push Up", group: "kol", type: "compound", minStep: 2.5, aliases: ["elmas şınav"] },
+  { name: "Wrist Curl", group: "kol", type: "isolation", minStep: 1.25, aliases: ["bilek curl", "önkol curl"] },
+  { name: "Reverse Wrist Curl", group: "kol", type: "isolation", minStep: 1.25, aliases: ["ters bilek curl"] },
+
+  // ------------------------------------------------- bacak (ek)
+  { name: "Goblet Squat", group: "bacak", type: "compound", minStep: 2.5, aliases: ["goblet"] },
+  { name: "Sumo Squat", group: "bacak", type: "compound", minStep: 5, aliases: ["sumo çömelme"] },
+  { name: "Smith Machine Squat", group: "bacak", type: "compound", minStep: 5, aliases: ["smith squat"] },
+  { name: "Reverse Lunge", group: "bacak", type: "compound", minStep: 2.5, aliases: ["geri hamle"] },
+  { name: "Step Up", group: "bacak", type: "compound", minStep: 2.5, aliases: ["step-up", "kutu çıkış"] },
+  { name: "Single Leg Romanian Deadlift", group: "bacak", type: "compound", minStep: 2.5, aliases: ["tek bacak rdl"] },
+  { name: "Glute Bridge", group: "bacak", type: "compound", minStep: 5, aliases: ["kalça köprüsü"] },
+  { name: "Nordic Curl", group: "bacak", type: "isolation", minStep: 2.5, aliases: ["nordic hamstring"] },
+  { name: "Seated Calf Raise", group: "bacak", type: "isolation", minStep: 1.25, aliases: ["oturarak baldır"] },
+  { name: "Standing Calf Raise", group: "bacak", type: "isolation", minStep: 1.25, aliases: ["ayakta baldır"] },
+  { name: "Leg Press Calf Raise", group: "bacak", type: "isolation", minStep: 1.25, aliases: ["leg press baldır"] },
+  { name: "Cable Kickback", group: "bacak", type: "isolation", minStep: 1.25, aliases: ["kablo kalça", "glute kickback"] },
+  { name: "Hip Abduction", group: "bacak", type: "isolation", minStep: 1.25, aliases: ["abdüksiyon", "kalça açma"] },
+  { name: "Hip Adduction", group: "bacak", type: "isolation", minStep: 1.25, aliases: ["addüksiyon", "kalça kapama"] },
+
+  // ------------------------------------------------- karın (ek)
+  { name: "Sit Up", group: "karın", type: "isolation", minStep: 1.25, aliases: ["sit-up", "klasik mekik"] },
+  { name: "Bicycle Crunch", group: "karın", type: "isolation", minStep: 1.25, aliases: ["bisiklet mekik"] },
+  { name: "Russian Twist", group: "karın", type: "isolation", minStep: 1.25, aliases: ["rus twist", "gövde dönüş"] },
+  { name: "Side Plank", group: "karın", type: "isolation", minStep: 1.25, aliases: ["yan plank"] },
+  { name: "Dead Bug", group: "karın", type: "isolation", minStep: 1.25, aliases: ["ölü böcek"] },
+  { name: "Hollow Hold", group: "karın", type: "isolation", minStep: 1.25, aliases: ["hollow"] },
+  { name: "Woodchopper", group: "karın", type: "isolation", minStep: 1.25, aliases: ["odun kesme", "cable woodchop"] },
+  { name: "Toes to Bar", group: "karın", type: "isolation", minStep: 2.5, aliases: ["bara ayak"] },
 ];
 
 /** Normalize edilmiş kanonik ad -> katalog kaydı. */
