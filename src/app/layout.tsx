@@ -16,6 +16,13 @@ export const metadata: Metadata = {
   title: "Coach.ai — Yapay Zekâ Destekli Antrenman Asistanı",
   description:
     "Geçmiş antrenmanlarını okuyup bir sonraki seansını planlayan dijital antrenör.",
+  // Ana ekrana eklendiğinde iOS'ta tam ekran açılsın ve durum çubuğu
+  // uygulamanın koyu temasıyla uyumlu olsun.
+  appleWebApp: {
+    capable: true,
+    title: "Coach.ai",
+    statusBarStyle: "black-translucent",
+  },
 };
 
 // Uygulama esas olarak telefonda kullanılıyor.
