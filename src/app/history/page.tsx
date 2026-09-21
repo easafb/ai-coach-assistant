@@ -27,7 +27,7 @@ export default async function HistoryPage() {
             Henüz tamamlanmış bir antrenmanın yok.
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="stagger-children space-y-4">
             {history.map((session) => (
               <div
                 key={session.id}
