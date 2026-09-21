@@ -4,10 +4,10 @@ import {
   getRoutineExercises,
   getExerciseHistory,
   getActiveAdjustments,
+  getExerciseResolver,
 } from "@/lib/queries";
 import { prescribe, normalizeExerciseName } from "@/lib/progression";
 import { applyAdjustment, type WorkoutPlanItem } from "@/lib/adjustments";
-import { catalogIncrement } from "@/lib/exercises";
 import ActiveWorkout from "@/components/workout/ActiveWorkout";
 
 export default async function WorkoutPage({
@@ -17,10 +17,11 @@ export default async function WorkoutPage({
 }) {
   const { id } = await params;
 
-  const [exercises, history, adjustments] = await Promise.all([
+  const [exercises, history, adjustments, resolve] = await Promise.all([
     getRoutineExercises(id),
     getExerciseHistory(),
     getActiveAdjustments(),
+    getExerciseResolver(),
   ]);
 
   if (exercises.length === 0) notFound();
@@ -35,7 +36,9 @@ export default async function WorkoutPage({
         name: exercise.exercise_name,
         targetSets: exercise.default_sets,
         targetReps: exercise.default_reps,
-        increment: catalogIncrement(exercise.exercise_name),
+        // Katalogda veya kullanıcının kendi hareketlerinde varsa kesin adım;
+        // yoksa motor addan çıkarım yapar.
+        increment: resolve(exercise.exercise_name)?.increment,
       },
       history[key] ?? []
     );

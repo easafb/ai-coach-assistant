@@ -6,7 +6,9 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/dal";
 import { findTemplate } from "@/lib/templates";
 import { validateAdjustments, type Adjustment } from "@/lib/adjustments";
-import { getUserExerciseNames } from "@/lib/queries";
+import { getUserExerciseNames, getExerciseResolver } from "@/lib/queries";
+import { normalizeExerciseName } from "@/lib/progression";
+import type { MuscleGroup } from "@/lib/exercises";
 import type { ActionResult, ExerciseDraft } from "@/types";
 
 const ok = <T,>(data: T): ActionResult<T> => ({ ok: true, data });
@@ -291,7 +293,10 @@ export async function saveAdjustmentsAction(
 
   // İstemciden gelen veriye güvenmiyoruz: kullanıcının gerçek egzersizlerine
   // ve katalog kas gruplarına karşı yeniden doğruluyoruz.
-  const userExercises = await getUserExerciseNames();
+  const [userExercises, resolve] = await Promise.all([
+    getUserExerciseNames(),
+    getExerciseResolver(),
+  ]);
   const validated = validateAdjustments(
     adjustments.map((a) => ({
       exercise: a.exerciseName,
@@ -299,7 +304,8 @@ export async function saveAdjustmentsAction(
       substitute: a.substituteName ?? undefined,
       reason: a.reason,
     })),
-    userExercises
+    userExercises,
+    resolve
   );
 
   if (validated.length === 0) return fail("Geçerli bir ayarlama bulunamadı.");
@@ -343,4 +349,53 @@ export async function dismissAdjustmentAction(
   revalidatePath("/dashboard");
   revalidatePath("/coach");
   return ok(null);
+}
+
+// ==========================================
+// Kullanıcıya özel egzersiz
+// ==========================================
+
+const MUSCLE_GROUPS: MuscleGroup[] = ["göğüs", "sırt", "omuz", "kol", "bacak", "karın"];
+const ALLOWED_INCREMENTS = [2.5, 5];
+
+/**
+ * Katalogda olmayan bir hareketi sınıflandırarak kullanıcının kişisel
+ * kataloğuna ekler. Sınıflandırma zorunlu: kas grubu bilinmeyen hareket
+ * doğru artış adımı alamıyor ve AI ona ikame öneremiyor.
+ */
+export async function createCustomExerciseAction(
+  name: string,
+  group: string,
+  increment: number
+): Promise<ActionResult<{ name: string }>> {
+  const user = await requireUser();
+
+  const trimmed = name.trim();
+  if (trimmed.length < 2 || trimmed.length > 60) {
+    return fail("Hareket adı 2-60 karakter olmalı.");
+  }
+  if (!MUSCLE_GROUPS.includes(group as MuscleGroup)) {
+    return fail("Geçersiz kas grubu.");
+  }
+  if (!ALLOWED_INCREMENTS.includes(increment)) {
+    return fail("Geçersiz artış adımı.");
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("custom_exercises").upsert(
+    {
+      user_id: user.id,
+      exercise_key: normalizeExerciseName(trimmed),
+      exercise_name: trimmed,
+      muscle_group: group,
+      increment,
+    },
+    { onConflict: "user_id,exercise_key" }
+  );
+
+  if (error) return dbFail("createCustomExercise", error);
+
+  revalidatePath("/routines/new");
+  revalidatePath("/dashboard");
+  return ok({ name: trimmed });
 }

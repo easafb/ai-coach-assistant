@@ -9,6 +9,7 @@ import {
   type Adjustment,
 } from "./adjustments.ts";
 import { prescribe, type Prescription } from "./progression.ts";
+import { catalogResolver, createResolver } from "./exercises.ts";
 
 const USER_EXERCISES = ["Bench Press", "Back Squat", "Overhead Press", "Barbell Row"];
 const NOW = new Date("2026-09-21T10:00:00Z");
@@ -27,6 +28,7 @@ test("geçerli öneri kabul edilir", () => {
   const result = validateAdjustments(
     [{ exercise: "Bench Press", action: "reduce_load", reason: "Omuz ağrısı." }],
     USER_EXERCISES,
+    catalogResolver,
     NOW
   );
   assert.equal(result.length, 1);
@@ -38,6 +40,7 @@ test("kullanıcıda olmayan hareket uydurulamaz", () => {
   const result = validateAdjustments(
     [{ exercise: "Leg Press", action: "skip", reason: "Diz ağrısı." }],
     USER_EXERCISES,
+    catalogResolver,
     NOW
   );
   assert.equal(result.length, 0);
@@ -47,6 +50,7 @@ test("egzersiz adı büyük/küçük harf farkıyla da eşleşir", () => {
   const result = validateAdjustments(
     [{ exercise: "bench press", action: "skip", reason: "Ağrı." }],
     USER_EXERCISES,
+    catalogResolver,
     NOW
   );
   assert.equal(result.length, 1);
@@ -57,6 +61,7 @@ test("geçersiz eylem reddedilir", () => {
   const result = validateAdjustments(
     [{ exercise: "Bench Press", action: "increase_load", reason: "İyi hissediyorum." }],
     USER_EXERCISES,
+    catalogResolver,
     NOW
   );
   assert.equal(result.length, 0);
@@ -70,6 +75,7 @@ test("boş veya eksik alanlar reddedilir", () => {
       { exercise: "Bench Press", action: "skip", reason: "   " },
     ],
     USER_EXERCISES,
+    catalogResolver,
     NOW
   );
   assert.equal(result.length, 0);
@@ -79,6 +85,7 @@ test("ikame aynı kas grubundan olmalı", () => {
   const sameGroup = validateAdjustments(
     [{ exercise: "Bench Press", action: "swap", substitute: "Dumbbell Bench Press", reason: "Omuz." }],
     USER_EXERCISES,
+    catalogResolver,
     NOW
   );
   assert.equal(sameGroup.length, 1);
@@ -87,6 +94,7 @@ test("ikame aynı kas grubundan olmalı", () => {
   const wrongGroup = validateAdjustments(
     [{ exercise: "Back Squat", action: "swap", substitute: "Barbell Curl", reason: "Diz." }],
     USER_EXERCISES,
+    catalogResolver,
     NOW
   );
   assert.equal(wrongGroup.length, 0, "squat yerine curl önerilememeli");
@@ -96,6 +104,7 @@ test("katalogda olmayan ikame reddedilir", () => {
   const result = validateAdjustments(
     [{ exercise: "Bench Press", action: "swap", substitute: "Uydurma Hareket", reason: "Ağrı." }],
     USER_EXERCISES,
+    catalogResolver,
     NOW
   );
   assert.equal(result.length, 0);
@@ -105,6 +114,7 @@ test("hareketin kendisiyle değiştirilmesi reddedilir", () => {
   const result = validateAdjustments(
     [{ exercise: "Bench Press", action: "swap", substitute: "bench", reason: "Ağrı." }],
     USER_EXERCISES,
+    catalogResolver,
     NOW
   );
   assert.equal(result.length, 0);
@@ -117,6 +127,7 @@ test("aynı hareket için yalnızca ilk öneri geçerli", () => {
       { exercise: "Bench Press", action: "reduce_load", reason: "İkinci." },
     ],
     USER_EXERCISES,
+    catalogResolver,
     NOW
   );
   assert.equal(result.length, 1);
@@ -127,6 +138,7 @@ test("gerekçe 300 karakterde kırpılır", () => {
   const result = validateAdjustments(
     [{ exercise: "Bench Press", action: "skip", reason: "x".repeat(500) }],
     USER_EXERCISES,
+    catalogResolver,
     NOW
   );
   assert.equal(result[0].reason.length, 300);
@@ -220,8 +232,71 @@ test("ayarlama 14 gün sonra düşecek şekilde damgalanır", () => {
   const result = validateAdjustments(
     [{ exercise: "Bench Press", action: "skip", reason: "Ağrı." }],
     USER_EXERCISES,
+    catalogResolver,
     NOW
   );
   const days = (new Date(result[0].expiresAt).getTime() - NOW.getTime()) / 86400000;
   assert.equal(days, 14);
+});
+
+// ------------------------------------------------- kullanıcıya özel hareketler
+
+test("sınıflandırılmamış hareket için ikame önerilemez", () => {
+  // Güvenlik davranışı: kas grubu bilinmeyen harekete ikame önerilirse
+  // "AAA yerine biceps curl" gibi saçma bir sonuç çıkardı.
+  const result = validateAdjustments(
+    [{ exercise: "AAA", action: "swap", substitute: "Dumbbell Bench Press", reason: "Ağrı." }],
+    ["AAA"],
+    catalogResolver,
+    NOW
+  );
+  assert.equal(result.length, 0);
+});
+
+test("sınıflandırılmamış harekette hafifletme ve atlama yine çalışır", () => {
+  for (const action of ["reduce_load", "skip"] as const) {
+    const result = validateAdjustments(
+      [{ exercise: "AAA", action, reason: "Ağrı." }],
+      ["AAA"],
+      catalogResolver,
+      NOW
+    );
+    assert.equal(result.length, 1, `${action} kabul edilmeliydi`);
+  }
+});
+
+test("sınıflandırılan kullanıcı hareketi ikame alabilir", () => {
+  const resolve = createResolver([
+    { exerciseKey: "aaa", name: "AAA", group: "göğüs", increment: 2.5 },
+  ]);
+  const result = validateAdjustments(
+    [{ exercise: "AAA", action: "swap", substitute: "Dumbbell Bench Press", reason: "Omuz." }],
+    ["AAA"],
+    resolve,
+    NOW
+  );
+  assert.equal(result.length, 1, "sınıflandırıldıktan sonra ikame mümkün olmalı");
+  assert.equal(result[0].substituteName, "Dumbbell Bench Press");
+});
+
+test("kullanıcı hareketi yanlış kas grubuna ikame edilemez", () => {
+  const resolve = createResolver([
+    { exerciseKey: "aaa", name: "AAA", group: "bacak", increment: 5 },
+  ]);
+  const result = validateAdjustments(
+    [{ exercise: "AAA", action: "swap", substitute: "Dumbbell Bench Press", reason: "Diz." }],
+    ["AAA"],
+    resolve,
+    NOW
+  );
+  assert.equal(result.length, 0, "bacak hareketi göğüs hareketiyle değiştirilememeli");
+});
+
+test("kullanıcı kaydı katalogla çakışırsa kullanıcınınki kazanır", () => {
+  const resolve = createResolver([
+    { exerciseKey: "bench press", name: "Bench Press", group: "göğüs", increment: 5 },
+  ]);
+  assert.equal(resolve("Bench Press")?.increment, 5);
+  assert.equal(resolve("Bench Press")?.custom, true);
+  assert.equal(catalogResolver("Bench Press")?.increment, 2.5);
 });
