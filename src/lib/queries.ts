@@ -256,3 +256,127 @@ export async function getCustomExercises(): Promise<CustomExercise[]> {
 export async function getExerciseResolver(): Promise<ExerciseResolver> {
   return createResolver(await getCustomExercises());
 }
+
+export interface ExerciseSummary {
+  name: string;
+  /** En son kullanılan çalışma ağırlığı. */
+  lastWeight: number;
+  /** Bugüne kadarki en ağır çalışma seti. */
+  bestWeight: number;
+  /** Bu hareketin yapıldığı seans sayısı (son 30 seans içinde). */
+  sessionCount: number;
+  /** En son ne zaman yapıldı (ISO). */
+  lastPerformed: string;
+}
+
+export interface TrainingSummary {
+  thisWeek: { sessions: number; volume: number };
+  lastWeek: { sessions: number; volume: number };
+  totalSessions: number;
+  exercises: ExerciseSummary[];
+}
+
+/**
+ * Koçun kullanıcının antrenmanı hakkında soru cevaplayabilmesi için derlenmiş
+ * özet. Bilerek kompakt: her set değil, hareket başına tek satır.
+ *
+ * Sayılar burada hesaplanıyor, modelde değil. Modele hazır rakam veriyoruz ve
+ * "hesaplama yapma, sadece verilenleri kullan" diyoruz; aksi halde uydurabilir.
+ */
+export async function getTrainingSummary(): Promise<TrainingSummary> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: sessions } = await supabase
+    .from("workout_sessions")
+    .select("id, end_time, total_volume")
+    .eq("user_id", user.id)
+    .not("end_time", "is", null)
+    .order("end_time", { ascending: false })
+    .limit(30);
+
+  const empty: TrainingSummary = {
+    thisWeek: { sessions: 0, volume: 0 },
+    lastWeek: { sessions: 0, volume: 0 },
+    totalSessions: 0,
+    exercises: [],
+  };
+
+  if (!sessions || sessions.length === 0) return empty;
+
+  const now = Date.now();
+  const DAY = 86_400_000;
+
+  const bucket = (from: number, to: number) => {
+    const rows = sessions.filter((s) => {
+      const t = new Date(s.end_time as string).getTime();
+      return t > now - from && t <= now - to;
+    });
+    return {
+      sessions: rows.length,
+      volume: Math.round(
+        rows.reduce((sum, r) => sum + (Number(r.total_volume) || 0), 0)
+      ),
+    };
+  };
+
+  const sessionIds = sessions.map((s) => s.id as string);
+  const endTimes = new Map(sessions.map((s) => [s.id as string, s.end_time as string]));
+
+  const { data: logs } = await supabase
+    .from("set_logs")
+    .select("session_id, exercise_name, weight")
+    .in("session_id", sessionIds);
+
+  const byExercise = new Map<string, ExerciseSummary>();
+
+  if (logs) {
+    // Seanslar en yeniden eskiye sıralı; ilk görülen kayıt en günceli.
+    const order = new Map(sessionIds.map((id, i) => [id, i]));
+    const sorted = [...logs].sort(
+      (a, b) =>
+        (order.get(a.session_id as string) ?? 0) -
+        (order.get(b.session_id as string) ?? 0)
+    );
+
+    const seenSessions = new Map<string, Set<string>>();
+
+    for (const log of sorted) {
+      const name = log.exercise_name as string;
+      const key = normalizeExerciseName(name);
+      const weight = Number(log.weight) || 0;
+      const sessionId = log.session_id as string;
+
+      const entry = byExercise.get(key);
+      if (!entry) {
+        byExercise.set(key, {
+          name,
+          lastWeight: weight,
+          bestWeight: weight,
+          sessionCount: 1,
+          lastPerformed: endTimes.get(sessionId) ?? "",
+        });
+        seenSessions.set(key, new Set([sessionId]));
+        continue;
+      }
+
+      entry.bestWeight = Math.max(entry.bestWeight, weight);
+
+      const seen = seenSessions.get(key)!;
+      if (!seen.has(sessionId)) {
+        seen.add(sessionId);
+        entry.sessionCount += 1;
+      } else {
+        // Aynı seansın içindeyiz: en ağır set çalışma ağırlığıdır.
+        entry.lastWeight = Math.max(entry.lastWeight, weight);
+      }
+    }
+  }
+
+  return {
+    thisWeek: bucket(7 * DAY, 0),
+    lastWeek: bucket(14 * DAY, 7 * DAY),
+    totalSessions: sessions.length,
+    exercises: [...byExercise.values()].sort((a, b) => b.sessionCount - a.sessionCount),
+  };
+}
