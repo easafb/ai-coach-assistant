@@ -88,6 +88,11 @@ export async function createRoutineAction(
       default_sets: ex.sets,
       min_reps: ex.minReps,
       max_reps: ex.maxReps,
+      // default_reps artık okunmuyor (007 ile min_reps/max_reps geldi) ama
+      // kolon eski şemadan kalma ve NOT NULL olabilir. Doldurmaya devam
+      // ediyoruz: aksi halde rutin oluşturma sessizce patlar ve bu, yeni
+      // kullanıcının yaptığı ilk iştir.
+      default_reps: ex.minReps,
       order_index: index,
     }))
   );
@@ -260,6 +265,8 @@ export async function createRoutinesFromTemplateAction(
       default_sets: exercise.sets,
       min_reps: exercise.minReps,
       max_reps: exercise.maxReps,
+      // Bkz. createRoutineAction: eski şemadan kalan kolon, NOT NULL olabilir.
+      default_reps: exercise.minReps,
       order_index: index,
     }));
   });
