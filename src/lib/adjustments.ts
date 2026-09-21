@@ -15,7 +15,7 @@
 // ==========================================================================
 
 import { normalizeExerciseName, type Prescription } from "./progression.ts";
-import { findExercise } from "./exercises.ts";
+import { catalogResolver, type ExerciseResolver } from "./exercises.ts";
 
 export type AdjustmentAction = "reduce_load" | "swap" | "skip";
 
@@ -54,10 +54,13 @@ function isNonEmptyString(value: unknown): value is string {
  * Doğrulanamayan her öneri atılır — model uydurmuş olabilir.
  *
  * @param userExercises Kullanıcının rutinlerinde fiilen geçen egzersiz adları.
+ * @param resolve Katalog + kullanıcı hareketlerini çözen işlev. Enjekte
+ *   edilir ki bu modül saf ve test edilebilir kalsın.
  */
 export function validateAdjustments(
   raw: RawAdjustment[],
   userExercises: string[],
+  resolve: ExerciseResolver = catalogResolver,
   now: Date = new Date()
 ): Adjustment[] {
   const byKey = new Map(
@@ -88,8 +91,8 @@ export function validateAdjustments(
     if (action === "swap") {
       if (!isNonEmptyString(item.substitute)) continue;
 
-      const substitute = findExercise(item.substitute);
-      const original = findExercise(exerciseName);
+      const substitute = resolve(item.substitute);
+      const original = resolve(exerciseName);
 
       // İkame katalogda olmalı ve aynı kas grubunu çalıştırmalı.
       // Aksi halde model "squat yerine biceps curl" diyebilir.
@@ -183,5 +186,10 @@ export interface WorkoutPlanItem {
   /** Fiilen yapılacak hareket (swap sonrası değişmiş olabilir). */
   performedName: string;
   targetSets: number;
+  /**
+   * Hareket katalogda ya da kullanıcının kendi kayıtlarında tanımlı mı?
+   * Değilse artış adımı tahmine düşüyor ve AI ona ikame öneremiyor.
+   */
+  classified: boolean;
   prescription: AdjustedPrescription;
 }

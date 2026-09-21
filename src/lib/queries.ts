@@ -5,6 +5,11 @@ import { requireUser } from "@/lib/dal";
 import type { Routine, RoutineExercise, WorkoutSession } from "@/types";
 import { normalizeExerciseName, type ExercisePerformance } from "@/lib/progression";
 import type { Adjustment } from "@/lib/adjustments";
+import {
+  createResolver,
+  type CustomExercise,
+  type ExerciseResolver,
+} from "@/lib/exercises";
 
 // ==========================================
 // OKUMA KATMANI
@@ -224,4 +229,29 @@ export async function getActiveAdjustments(): Promise<Record<string, Adjustment>
       } satisfies Adjustment,
     ])
   );
+}
+
+/** Kullanıcının kendi eklediği, sınıflandırılmış hareketler. */
+export async function getCustomExercises(): Promise<CustomExercise[]> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("custom_exercises")
+    .select("exercise_key, exercise_name, muscle_group, increment")
+    .eq("user_id", user.id);
+
+  if (!data) return [];
+
+  return data.map((row) => ({
+    exerciseKey: row.exercise_key as string,
+    name: row.exercise_name as string,
+    group: row.muscle_group as CustomExercise["group"],
+    increment: Number(row.increment),
+  }));
+}
+
+/** Katalog + kullanıcı hareketlerini birleştiren çözümleyici. */
+export async function getExerciseResolver(): Promise<ExerciseResolver> {
+  return createResolver(await getCustomExercises());
 }

@@ -1,7 +1,7 @@
 "use server";
 
 import { requireUser } from "@/lib/dal";
-import { getUserExerciseNames } from "@/lib/queries";
+import { getUserExerciseNames, getExerciseResolver } from "@/lib/queries";
 import { validateAdjustments, type Adjustment, type RawAdjustment } from "@/lib/adjustments";
 import { EXERCISE_CATALOG } from "@/lib/exercises";
 import type { ActionResult } from "@/types";
@@ -100,7 +100,10 @@ export async function requestCoachPlan(
     return { ok: false, error: "Mesaj çok uzun." };
   }
 
-  const userExercises = await getUserExerciseNames();
+  const [userExercises, resolve] = await Promise.all([
+    getUserExerciseNames(),
+    getExerciseResolver(),
+  ]);
   if (userExercises.length === 0) {
     return {
       ok: false,
@@ -140,7 +143,14 @@ export async function requestCoachPlan(
             parts: [
               {
                 text: [
-                  `Kullanıcının programındaki hareketler: ${userExercises.join(", ")}`,
+                  // Kas grubunu da veriyoruz: model hangi hareketin neyi
+                  // çalıştırdığını bilmeden isabetli ikame öneremiyor.
+                  `Kullanıcının programındaki hareketler: ${userExercises
+                    .map((name) => {
+                      const group = resolve(name)?.group;
+                      return group ? `${name} (${group})` : `${name} (sınıflandırılmamış)`;
+                    })
+                    .join(", ")}`,
                   "",
                   `İkame seçebileceğin katalog (kas grubuna göre): ${JSON.stringify(catalogByGroup)}`,
                   "",
@@ -187,7 +197,7 @@ export async function requestCoachPlan(
           typeof parsed.summary === "string" && parsed.summary.trim()
             ? parsed.summary.trim().slice(0, 400)
             : "Programını gözden geçirdim.",
-        adjustments: validateAdjustments(rawAdjustments, userExercises),
+        adjustments: validateAdjustments(rawAdjustments, userExercises, resolve),
         seekMedicalAttention: parsed.seekMedicalAttention === true,
       },
     };

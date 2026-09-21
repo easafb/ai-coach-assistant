@@ -125,6 +125,71 @@ export function catalogIncrement(name: string): number | undefined {
   return findExercise(name)?.increment;
 }
 
+// ==========================================================================
+// ÇÖZÜMLEYİCİ (Resolver)
+//
+// Kullanıcının kendi eklediği hareketler katalogdakilerle eşit davranmalı:
+// doğru artış adımı, AI ikamesi, analitik. Ama bu kullanıcıya özel veri ve
+// onu doğrudan saf modüllere sızdırmak istemiyoruz.
+//
+// Çözüm: arama işlevini dışarıdan enjekte ediyoruz. Sunucu, katalog ile
+// kullanıcının kayıtlarını birleştirip bir resolver kuruyor; adjustments.ts
+// ve progression.ts saf kalmaya devam ediyor.
+// ==========================================================================
+
+/** Hem katalog hem kullanıcı hareketleri için ortak biçim. */
+export interface ResolvedExercise {
+  name: string;
+  group: MuscleGroup;
+  increment: number;
+  /** Kullanıcının kendi eklediği bir hareket mi? */
+  custom: boolean;
+}
+
+export type ExerciseResolver = (name: string) => ResolvedExercise | undefined;
+
+export interface CustomExercise {
+  exerciseKey: string;
+  name: string;
+  group: MuscleGroup;
+  increment: number;
+}
+
+/** Yalnızca katalogdan çözümler. Kullanıcı verisi olmayan yerlerde varsayılan. */
+export const catalogResolver: ExerciseResolver = (name) => {
+  const found = findExercise(name);
+  if (!found) return undefined;
+  return {
+    name: found.name,
+    group: found.group,
+    increment: found.increment,
+    custom: false,
+  };
+};
+
+/**
+ * Katalog + kullanıcının kendi hareketleri.
+ * Kullanıcı kaydı katalogla çakışırsa kullanıcınınki kazanır: kendi
+ * sınıflandırmasını bilerek yapmıştır.
+ */
+export function createResolver(customs: CustomExercise[]): ExerciseResolver {
+  const byKey = new Map(customs.map((c) => [c.exerciseKey, c]));
+
+  return (name) => {
+    const key = normalizeExerciseName(name);
+    const custom = byKey.get(key);
+    if (custom) {
+      return {
+        name: custom.name,
+        group: custom.group,
+        increment: custom.increment,
+        custom: true,
+      };
+    }
+    return catalogResolver(name);
+  };
+}
+
 /**
  * Otomatik tamamlama araması. Kanonik adda ve takma adlarda geçen her kaydı
  * döndürür; kanonik adın başında eşleşenler öne alınır.
