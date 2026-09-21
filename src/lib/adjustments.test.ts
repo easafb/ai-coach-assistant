@@ -16,9 +16,9 @@ const NOW = new Date("2026-09-21T10:00:00Z");
 
 const progressPrescription = (): Prescription =>
   prescribe(
-    { name: "Bench Press", targetSets: 3, targetReps: 8, increment: 2.5 },
+    { name: "Bench Press", targetSets: 3, minReps: 8, maxReps: 12, minStep: 2.5, type: "compound" },
     [{ sessionId: "s1", performedAt: "2026-09-14", sets: [
-      { weight: 60, reps: 8 }, { weight: 60, reps: 8 }, { weight: 60, reps: 8 },
+      { weight: 60, reps: 12 }, { weight: 60, reps: 12 }, { weight: 60, reps: 12 },
     ] }]
   );
 
@@ -267,7 +267,7 @@ test("sınıflandırılmamış harekette hafifletme ve atlama yine çalışır",
 
 test("sınıflandırılan kullanıcı hareketi ikame alabilir", () => {
   const resolve = createResolver([
-    { exerciseKey: "aaa", name: "AAA", group: "göğüs", increment: 2.5 },
+    { exerciseKey: "aaa", name: "AAA", group: "göğüs", type: "compound", minStep: 2.5 },
   ]);
   const result = validateAdjustments(
     [{ exercise: "AAA", action: "swap", substitute: "Dumbbell Bench Press", reason: "Omuz." }],
@@ -281,7 +281,7 @@ test("sınıflandırılan kullanıcı hareketi ikame alabilir", () => {
 
 test("kullanıcı hareketi yanlış kas grubuna ikame edilemez", () => {
   const resolve = createResolver([
-    { exerciseKey: "aaa", name: "AAA", group: "bacak", increment: 5 },
+    { exerciseKey: "aaa", name: "AAA", group: "bacak", type: "compound", minStep: 5 },
   ]);
   const result = validateAdjustments(
     [{ exercise: "AAA", action: "swap", substitute: "Dumbbell Bench Press", reason: "Diz." }],
@@ -294,9 +294,9 @@ test("kullanıcı hareketi yanlış kas grubuna ikame edilemez", () => {
 
 test("kullanıcı kaydı katalogla çakışırsa kullanıcınınki kazanır", () => {
   const resolve = createResolver([
-    { exerciseKey: "bench press", name: "Bench Press", group: "göğüs", increment: 5 },
+    { exerciseKey: "bench press", name: "Bench Press", group: "göğüs", type: "compound", minStep: 5 },
   ]);
-  assert.equal(resolve("Bench Press")?.increment, 5);
+  assert.equal(resolve("Bench Press")?.minStep, 5);
   assert.equal(resolve("Bench Press")?.custom, true);
-  assert.equal(catalogResolver("Bench Press")?.increment, 2.5);
+  assert.equal(catalogResolver("Bench Press")?.minStep, 2.5);
 });

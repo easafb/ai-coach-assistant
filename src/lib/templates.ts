@@ -7,12 +7,22 @@
 //
 // Egzersiz adları bilerek katalogdaki kanonik adlardır: geçmiş eşleşmesi ve
 // artış adımı ilk günden doğru çalışsın diye.
+//
+// TEKRAR HEDEFLERİ hareket tipine göre kurulur:
+//   Bileşik  -> sabit tekrar (minReps === maxReps). Hedefi tutturunca ağırlık
+//               artar; programın omurgasında istenen his budur.
+//   İzolasyon -> aralık. 10 kg'lık bir lateral raise'e 2.5 kg eklemek %25'lik
+//               bir sıçramadır ve kimse bunu bir seansta yapamaz; bu hareketler
+//               önce tekrar biriktirir, sonra mikro adımla ilerler.
 // ==========================================================================
 
 export interface TemplateExercise {
   name: string;
   sets: number;
-  reps: number;
+  /** Tekrar aralığının alt ucu. */
+  minReps: number;
+  /** Üst uç: tüm setler buraya ulaşınca ağırlık artar. */
+  maxReps: number;
 }
 
 export interface TemplateRoutine {
@@ -39,31 +49,31 @@ export const ROUTINE_TEMPLATES: RoutineTemplate[] = [
       {
         name: "Push",
         exercises: [
-          { name: "Bench Press", sets: 4, reps: 6 },
-          { name: "Overhead Press", sets: 3, reps: 8 },
-          { name: "Incline Dumbbell Press", sets: 3, reps: 10 },
-          { name: "Lateral Raise", sets: 3, reps: 12 },
-          { name: "Triceps Pushdown", sets: 3, reps: 12 },
+          { name: "Bench Press", sets: 4, minReps: 6, maxReps: 6 },
+          { name: "Overhead Press", sets: 3, minReps: 8, maxReps: 8 },
+          { name: "Incline Dumbbell Press", sets: 3, minReps: 10, maxReps: 10 },
+          { name: "Lateral Raise", sets: 3, minReps: 12, maxReps: 16 },
+          { name: "Triceps Pushdown", sets: 3, minReps: 12, maxReps: 16 },
         ],
       },
       {
         name: "Pull",
         exercises: [
-          { name: "Deadlift", sets: 3, reps: 5 },
-          { name: "Pull Up", sets: 4, reps: 8 },
-          { name: "Barbell Row", sets: 3, reps: 8 },
-          { name: "Face Pull", sets: 3, reps: 15 },
-          { name: "Barbell Curl", sets: 3, reps: 10 },
+          { name: "Deadlift", sets: 3, minReps: 5, maxReps: 5 },
+          { name: "Pull Up", sets: 4, minReps: 8, maxReps: 8 },
+          { name: "Barbell Row", sets: 3, minReps: 8, maxReps: 8 },
+          { name: "Face Pull", sets: 3, minReps: 15, maxReps: 19 },
+          { name: "Barbell Curl", sets: 3, minReps: 10, maxReps: 14 },
         ],
       },
       {
         name: "Legs",
         exercises: [
-          { name: "Back Squat", sets: 4, reps: 6 },
-          { name: "Romanian Deadlift", sets: 3, reps: 8 },
-          { name: "Leg Press", sets: 3, reps: 10 },
-          { name: "Leg Curl", sets: 3, reps: 12 },
-          { name: "Calf Raise", sets: 4, reps: 15 },
+          { name: "Back Squat", sets: 4, minReps: 6, maxReps: 6 },
+          { name: "Romanian Deadlift", sets: 3, minReps: 8, maxReps: 8 },
+          { name: "Leg Press", sets: 3, minReps: 10, maxReps: 10 },
+          { name: "Leg Curl", sets: 3, minReps: 12, maxReps: 16 },
+          { name: "Calf Raise", sets: 4, minReps: 15, maxReps: 19 },
         ],
       },
     ],
@@ -78,22 +88,22 @@ export const ROUTINE_TEMPLATES: RoutineTemplate[] = [
       {
         name: "Upper",
         exercises: [
-          { name: "Bench Press", sets: 4, reps: 6 },
-          { name: "Barbell Row", sets: 4, reps: 8 },
-          { name: "Overhead Press", sets: 3, reps: 8 },
-          { name: "Lat Pulldown", sets: 3, reps: 10 },
-          { name: "Dumbbell Curl", sets: 3, reps: 12 },
-          { name: "Triceps Pushdown", sets: 3, reps: 12 },
+          { name: "Bench Press", sets: 4, minReps: 6, maxReps: 6 },
+          { name: "Barbell Row", sets: 4, minReps: 8, maxReps: 8 },
+          { name: "Overhead Press", sets: 3, minReps: 8, maxReps: 8 },
+          { name: "Lat Pulldown", sets: 3, minReps: 10, maxReps: 10 },
+          { name: "Dumbbell Curl", sets: 3, minReps: 12, maxReps: 16 },
+          { name: "Triceps Pushdown", sets: 3, minReps: 12, maxReps: 16 },
         ],
       },
       {
         name: "Lower",
         exercises: [
-          { name: "Back Squat", sets: 4, reps: 6 },
-          { name: "Romanian Deadlift", sets: 3, reps: 8 },
-          { name: "Bulgarian Split Squat", sets: 3, reps: 10 },
-          { name: "Leg Curl", sets: 3, reps: 12 },
-          { name: "Calf Raise", sets: 4, reps: 15 },
+          { name: "Back Squat", sets: 4, minReps: 6, maxReps: 6 },
+          { name: "Romanian Deadlift", sets: 3, minReps: 8, maxReps: 8 },
+          { name: "Bulgarian Split Squat", sets: 3, minReps: 10, maxReps: 10 },
+          { name: "Leg Curl", sets: 3, minReps: 12, maxReps: 16 },
+          { name: "Calf Raise", sets: 4, minReps: 15, maxReps: 19 },
         ],
       },
     ],
@@ -108,19 +118,19 @@ export const ROUTINE_TEMPLATES: RoutineTemplate[] = [
       {
         name: "Full Body A",
         exercises: [
-          { name: "Back Squat", sets: 3, reps: 5 },
-          { name: "Bench Press", sets: 3, reps: 5 },
-          { name: "Barbell Row", sets: 3, reps: 8 },
-          { name: "Plank", sets: 3, reps: 1 },
+          { name: "Back Squat", sets: 3, minReps: 5, maxReps: 5 },
+          { name: "Bench Press", sets: 3, minReps: 5, maxReps: 5 },
+          { name: "Barbell Row", sets: 3, minReps: 8, maxReps: 8 },
+          { name: "Plank", sets: 3, minReps: 1, maxReps: 5 },
         ],
       },
       {
         name: "Full Body B",
         exercises: [
-          { name: "Deadlift", sets: 3, reps: 5 },
-          { name: "Overhead Press", sets: 3, reps: 5 },
-          { name: "Lat Pulldown", sets: 3, reps: 10 },
-          { name: "Leg Press", sets: 3, reps: 10 },
+          { name: "Deadlift", sets: 3, minReps: 5, maxReps: 5 },
+          { name: "Overhead Press", sets: 3, minReps: 5, maxReps: 5 },
+          { name: "Lat Pulldown", sets: 3, minReps: 10, maxReps: 10 },
+          { name: "Leg Press", sets: 3, minReps: 10, maxReps: 10 },
         ],
       },
     ],

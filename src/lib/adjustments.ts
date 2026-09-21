@@ -186,6 +186,9 @@ export interface WorkoutPlanItem {
   /** Fiilen yapılacak hareket (swap sonrası değişmiş olabilir). */
   performedName: string;
   targetSets: number;
+  /** Tekrar aralığının uçları; arayüz hedefi bağlamıyla gösterebilsin diye. */
+  minReps: number;
+  maxReps: number;
   /**
    * Hareket katalogda ya da kullanıcının kendi kayıtlarında tanımlı mı?
    * Değilse artış adımı tahmine düşüyor ve AI ona ikame öneremiyor.

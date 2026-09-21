@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 
 import { createCustomExerciseAction } from "@/app/actions/workoutActions";
-import type { MuscleGroup } from "@/lib/exercises";
+import type { MuscleGroup, ExerciseType } from "@/lib/exercises";
 
 const GROUPS: MuscleGroup[] = ["göğüs", "sırt", "omuz", "kol", "bacak", "karın"];
 
@@ -21,7 +21,8 @@ interface Props {
  */
 export default function ExerciseClassifier({ name, onDone, onCancel }: Props) {
   const [group, setGroup] = useState<MuscleGroup | null>(null);
-  const [increment, setIncrement] = useState<2.5 | 5>(2.5);
+  const [type, setType] = useState<ExerciseType>("compound");
+  const [minStep, setMinStep] = useState<1.25 | 2.5 | 5>(2.5);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -29,7 +30,7 @@ export default function ExerciseClassifier({ name, onDone, onCancel }: Props) {
     if (!group) return;
     setError(null);
     startTransition(async () => {
-      const result = await createCustomExerciseAction(name, group, increment);
+      const result = await createCustomExerciseAction(name, group, type, minStep);
       if (result.ok) onDone(result.data.name);
       else setError(result.error);
     });
@@ -50,8 +51,8 @@ export default function ExerciseClassifier({ name, onDone, onCancel }: Props) {
             type="button"
             onClick={() => {
               setGroup(g);
-              // Bacak bileşik hareketleri genelde daha hızlı ilerler.
-              setIncrement(g === "bacak" ? 5 : 2.5);
+              // Bacak bileşikleri daha büyük plakalarla çalışılır.
+              setMinStep(g === "bacak" ? 5 : 2.5);
             }}
             className={`min-h-11 rounded-xl px-4 text-sm font-bold capitalize transition-colors ${
               group === g ? "bg-blue-600 text-white" : "bg-white/5 text-slate-300"
@@ -62,20 +63,44 @@ export default function ExerciseClassifier({ name, onDone, onCancel }: Props) {
         ))}
       </div>
 
+      <p className="mb-2 text-xs font-bold text-slate-400">Hareket tipi?</p>
+      <div className="mb-4 flex gap-2">
+        {(["compound", "isolation"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            onClick={() => {
+              setType(t);
+              // İzolasyon hareketleri mikro plakayla daha ince ilerleyebilir.
+              if (t === "isolation") setMinStep(1.25);
+            }}
+            className={`min-h-11 flex-1 rounded-xl px-3 text-sm font-bold transition-colors ${
+              type === t ? "bg-blue-600 text-white" : "bg-white/5 text-slate-300"
+            }`}
+          >
+            {t === "compound" ? "Bileşik" : "İzolasyon"}
+          </button>
+        ))}
+      </div>
+      <p className="mb-4 text-[11px] leading-snug text-slate-500">
+        Bileşik: birden fazla eklemi çalıştırır (squat, bench, row). İzolasyon:
+        tek kası hedefler (lateral raise, curl) ve daha yavaş ilerler.
+      </p>
+
       <p className="mb-2 text-xs font-bold text-slate-400">
-        Her ilerlemede ne kadar eklensin?
+        Salonda yapabildiğin en küçük ağırlık artışı?
       </p>
       <div className="mb-4 flex gap-2">
-        {([2.5, 5] as const).map((step) => (
+        {([1.25, 2.5, 5] as const).map((step) => (
           <button
             key={step}
             type="button"
-            onClick={() => setIncrement(step)}
-            className={`min-h-11 flex-1 rounded-xl px-4 text-sm font-bold transition-colors ${
-              increment === step ? "bg-blue-600 text-white" : "bg-white/5 text-slate-300"
+            onClick={() => setMinStep(step)}
+            className={`min-h-11 flex-1 rounded-xl px-3 text-sm font-bold transition-colors ${
+              minStep === step ? "bg-blue-600 text-white" : "bg-white/5 text-slate-300"
             }`}
           >
-            +{step} kg
+            {step} kg
           </button>
         ))}
       </div>

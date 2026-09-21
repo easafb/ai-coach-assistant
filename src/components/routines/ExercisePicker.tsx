@@ -138,7 +138,7 @@ export default function ExercisePicker({
             >
               <span className="font-semibold">{exercise.name}</span>
               <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                {exercise.group} · +{exercise.increment}kg
+                {exercise.group} · {exercise.type === "isolation" ? "izolasyon" : "bileşik"}
               </span>
             </li>
           ))}
