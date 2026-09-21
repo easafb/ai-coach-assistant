@@ -35,10 +35,12 @@ export default async function WorkoutPage({
       {
         name: exercise.exercise_name,
         targetSets: exercise.default_sets,
-        targetReps: exercise.default_reps,
-        // Katalogda veya kullanıcının kendi hareketlerinde varsa kesin adım;
+        minReps: exercise.min_reps,
+        maxReps: exercise.max_reps,
+        // Katalogda veya kullanıcının kendi hareketlerinde varsa kesin bilgi;
         // yoksa motor addan çıkarım yapar.
-        increment: resolve(exercise.exercise_name)?.increment,
+        minStep: resolve(exercise.exercise_name)?.minStep,
+        type: resolve(exercise.exercise_name)?.type,
       },
       history[key] ?? []
     );
@@ -54,6 +56,8 @@ export default async function WorkoutPage({
       originalName: exercise.exercise_name,
       performedName: adjusted.displayName,
       targetSets: exercise.default_sets,
+      minReps: exercise.min_reps,
+      maxReps: exercise.max_reps,
       classified: resolve(exercise.exercise_name) !== undefined,
       prescription: adjusted,
     };

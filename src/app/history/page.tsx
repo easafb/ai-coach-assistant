@@ -3,6 +3,7 @@ import { Calendar, ArrowLeft } from "lucide-react";
 
 import { getWorkoutHistory } from "@/lib/queries";
 import BottomNav from "@/components/navigation/BottomNav";
+import FeedbackButton from "@/components/feedback/FeedbackButton";
 
 export default async function HistoryPage() {
   const history = await getWorkoutHistory();
@@ -61,6 +62,7 @@ export default async function HistoryPage() {
           </div>
         )}
       </div>
+      <FeedbackButton />
       <BottomNav />
     </div>
   );

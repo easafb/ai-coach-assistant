@@ -8,7 +8,7 @@ import { findTemplate } from "@/lib/templates";
 import { validateAdjustments, type Adjustment } from "@/lib/adjustments";
 import { getUserExerciseNames, getExerciseResolver } from "@/lib/queries";
 import { normalizeExerciseName } from "@/lib/progression";
-import type { MuscleGroup } from "@/lib/exercises";
+import type { MuscleGroup, ExerciseType } from "@/lib/exercises";
 import type { ActionResult, ExerciseDraft } from "@/types";
 
 const ok = <T,>(data: T): ActionResult<T> => ({ ok: true, data });
@@ -54,11 +54,17 @@ export async function createRoutineAction(
   if (!trimmedName) return fail("Rutin adı boş olamaz.");
 
   const cleaned = exercises
-    .map((ex) => ({
-      name: ex.name.trim(),
-      sets: Math.max(1, Math.min(20, Math.trunc(ex.sets) || 0)),
-      reps: Math.max(1, Math.min(100, Math.trunc(ex.reps) || 0)),
-    }))
+    .map((ex) => {
+      const minReps = Math.max(1, Math.min(100, Math.trunc(ex.minReps) || 1));
+      // Üst uç alt ucun altına düşemez.
+      const maxReps = Math.max(minReps, Math.min(100, Math.trunc(ex.maxReps) || minReps));
+      return {
+        name: ex.name.trim(),
+        sets: Math.max(1, Math.min(20, Math.trunc(ex.sets) || 0)),
+        minReps,
+        maxReps,
+      };
+    })
     .filter((ex) => ex.name.length > 0);
 
   if (cleaned.length === 0) return fail("En az bir egzersiz eklemelisin.");
@@ -80,7 +86,8 @@ export async function createRoutineAction(
       routine_id: routine.id,
       exercise_name: ex.name,
       default_sets: ex.sets,
-      default_reps: ex.reps,
+      min_reps: ex.minReps,
+      max_reps: ex.maxReps,
       order_index: index,
     }))
   );
@@ -251,7 +258,8 @@ export async function createRoutinesFromTemplateAction(
       routine_id: routineId,
       exercise_name: exercise.name,
       default_sets: exercise.sets,
-      default_reps: exercise.reps,
+      min_reps: exercise.minReps,
+      max_reps: exercise.maxReps,
       order_index: index,
     }));
   });
@@ -356,7 +364,8 @@ export async function dismissAdjustmentAction(
 // ==========================================
 
 const MUSCLE_GROUPS: MuscleGroup[] = ["göğüs", "sırt", "omuz", "kol", "bacak", "karın"];
-const ALLOWED_INCREMENTS = [2.5, 5];
+const EXERCISE_TYPES: ExerciseType[] = ["compound", "isolation"];
+const ALLOWED_STEPS = [1.25, 2.5, 5];
 
 /**
  * Katalogda olmayan bir hareketi sınıflandırarak kullanıcının kişisel
@@ -366,7 +375,8 @@ const ALLOWED_INCREMENTS = [2.5, 5];
 export async function createCustomExerciseAction(
   name: string,
   group: string,
-  increment: number
+  type: string,
+  minStep: number
 ): Promise<ActionResult<{ name: string }>> {
   const user = await requireUser();
 
@@ -377,7 +387,10 @@ export async function createCustomExerciseAction(
   if (!MUSCLE_GROUPS.includes(group as MuscleGroup)) {
     return fail("Geçersiz kas grubu.");
   }
-  if (!ALLOWED_INCREMENTS.includes(increment)) {
+  if (!EXERCISE_TYPES.includes(type as ExerciseType)) {
+    return fail("Geçersiz hareket tipi.");
+  }
+  if (!ALLOWED_STEPS.includes(minStep)) {
     return fail("Geçersiz artış adımı.");
   }
 
@@ -388,7 +401,10 @@ export async function createCustomExerciseAction(
       exercise_key: normalizeExerciseName(trimmed),
       exercise_name: trimmed,
       muscle_group: group,
-      increment,
+      exercise_type: type,
+      min_step: minStep,
+      // 005'ten kalan kolon; NOT NULL olabileceği için dolduruyoruz.
+      increment: minStep,
     },
     { onConflict: "user_id,exercise_key" }
   );

@@ -29,14 +29,16 @@ interface Props {
 
 const DECISION_LABEL: Record<ProgressionDecision, string> = {
   "first-time": "İlk kez",
-  progress: "Artış",
+  "add-weight": "Ağırlık +",
+  "add-reps": "Tekrar +",
   repeat: "Tekrar",
   deload: "Deload",
 };
 
 const DECISION_STYLE: Record<ProgressionDecision, string> = {
   "first-time": "bg-neutral-200 text-neutral-700",
-  progress: "bg-emerald-100 text-emerald-700",
+  "add-weight": "bg-emerald-100 text-emerald-700",
+  "add-reps": "bg-blue-100 text-blue-700",
   repeat: "bg-amber-100 text-amber-700",
   deload: "bg-orange-100 text-orange-700",
 };
@@ -180,6 +182,11 @@ export default function ActiveWorkout({ routineId, plan }: Props) {
                     : "— kg"}
                   <span className="text-neutral-600"> × </span>
                   {item.targetSets} × {item.prescription.reps}
+                  {item.maxReps > item.minReps && (
+                    <span className="ml-2 text-xs font-medium text-neutral-500">
+                      (aralık {item.minReps}-{item.maxReps})
+                    </span>
+                  )}
                 </p>
 
                 {/* Sınıflandırılmamış hareket: artış adımı tahmine düşüyor ve

@@ -3,143 +3,206 @@ import assert from "node:assert/strict";
 
 import {
   prescribe,
-  inferIncrement,
-  roundToPlate,
+  incrementFor,
+  inferMinStep,
+  roundToStep,
   normalizeExerciseName,
   type ExercisePerformance,
   type ExerciseTarget,
 } from "./progression.ts";
 
-const target: ExerciseTarget = { name: "Bench Press", targetSets: 3, targetReps: 8 };
+const bench: ExerciseTarget = {
+  name: "Bench Press", targetSets: 3, minReps: 8, maxReps: 12,
+  minStep: 2.5, type: "compound",
+};
 
-const session = (
-  id: string,
-  sets: Array<[number, number]>
-): ExercisePerformance => ({
+const lateral: ExerciseTarget = {
+  name: "Lateral Raise", targetSets: 3, minReps: 10, maxReps: 15,
+  minStep: 1.25, type: "isolation",
+};
+
+const session = (id: string, sets: Array<[number, number]>): ExercisePerformance => ({
   sessionId: id,
-  performedAt: "2026-09-19T10:00:00Z",
+  performedAt: "2026-09-21T10:00:00Z",
   sets: sets.map(([weight, reps]) => ({ weight, reps })),
 });
 
-test("artış adımı: alt vücut bileşik hareketler 5 kg alır", () => {
-  assert.equal(inferIncrement("Back Squat"), 5);
-  assert.equal(inferIncrement("Romanian Deadlift"), 5);
-  assert.equal(inferIncrement("Leg Press"), 5);
-  assert.equal(inferIncrement("Ölü Kaldırma"), 5);
-  assert.equal(inferIncrement("Kalça Thrust"), 5);
+// ================================================== tekrar aralığı mantığı
+
+test("ilk kez: ağırlık önerilmez, alt uçtan başlanır", () => {
+  const r = prescribe(bench, []);
+  assert.equal(r.decision, "first-time");
+  assert.equal(r.weight, null);
+  assert.equal(r.reps, 8);
 });
 
-test("artış adımı: tanınmayan ve üst vücut hareketler 2.5 kg alır", () => {
-  assert.equal(inferIncrement("Bench Press"), 2.5);
-  assert.equal(inferIncrement("Biceps Curl"), 2.5);
-  assert.equal(inferIncrement("Uydurma Hareket"), 2.5);
+test("üst uca ulaşılmadıysa ağırlık DEĞİL tekrar artar", () => {
+  // Eski motorun en büyük hatası buydu: 8 tekrarı tutturan herkese
+  // her seans ağırlık artırmasını söylüyordu.
+  const r = prescribe(bench, [session("s1", [[60, 8], [60, 8], [60, 8]])]);
+  assert.equal(r.decision, "add-reps");
+  assert.equal(r.weight, 60, "ağırlık sabit kalmalı");
+  assert.equal(r.reps, 9, "bir tekrar eklenmeli");
 });
 
-test("geçmiş yoksa ağırlık önerilmez", () => {
-  const result = prescribe(target, []);
-  assert.equal(result.decision, "first-time");
-  assert.equal(result.weight, null);
+test("tüm setler üst uca ulaşınca ağırlık artar ve tekrar alt uca döner", () => {
+  const r = prescribe(bench, [session("s1", [[60, 12], [60, 12], [60, 12]])]);
+  assert.equal(r.decision, "add-weight");
+  assert.equal(r.weight, 62.5);
+  assert.equal(r.reps, 8, "ağırlık artınca tekrar alt uca dönmeli");
 });
 
-test("hedef tamamlandıysa ağırlık artar", () => {
-  const result = prescribe(target, [session("s1", [[60, 8], [60, 8], [60, 8]])]);
-  assert.equal(result.decision, "progress");
-  assert.equal(result.weight, 62.5);
+test("tek set eksik kaldıysa ağırlık artmaz", () => {
+  const r = prescribe(bench, [session("s1", [[60, 12], [60, 12], [60, 11]])]);
+  assert.equal(r.decision, "add-reps");
+  assert.equal(r.weight, 60);
+  assert.equal(r.reps, 12, "en zayıf set 11 -> hedef 12");
 });
 
-test("hedefin üstünde tekrar yapmak da ilerleme sayılır", () => {
-  const result = prescribe(target, [session("s1", [[60, 10], [60, 9], [60, 8]])]);
-  assert.equal(result.decision, "progress");
-  assert.equal(result.weight, 62.5);
+test("hedef tekrar üst ucu aşamaz", () => {
+  const r = prescribe(bench, [session("s1", [[60, 12], [60, 12], [60, 11]])]);
+  assert.ok(r.reps <= bench.maxReps);
 });
 
-test("tek set eksik kaldıysa aynı ağırlık tekrarlanır", () => {
-  const result = prescribe(target, [session("s1", [[60, 8], [60, 8], [60, 6]])]);
-  assert.equal(result.decision, "repeat");
-  assert.equal(result.weight, 60);
+// ================================== lateral raise: bildirilen somut sorun
+
+test("lateral raise aynı ağırlıkta tekrar ekleyerek ilerler", () => {
+  // Eski motor 10 kg'da hedefi tutturunca 12.5 kg öneriyordu: %25 sıçrama.
+  const r = prescribe(lateral, [session("s1", [[10, 10], [10, 10], [10, 10]])]);
+  assert.equal(r.decision, "add-reps");
+  assert.equal(r.weight, 10, "hafif izolasyonda ağırlık sıçramamalı");
+  assert.equal(r.reps, 11);
 });
 
-test("hedef set sayısına ulaşılamadıysa tekrarlanır", () => {
-  const result = prescribe(target, [session("s1", [[60, 8], [60, 8]])]);
-  assert.equal(result.decision, "repeat");
-  assert.equal(result.weight, 60);
+test("lateral raise üst uca ulaşınca mikro adımla artar", () => {
+  const r = prescribe(lateral, [session("s1", [[10, 15], [10, 15], [10, 15]])]);
+  assert.equal(r.decision, "add-weight");
+  assert.equal(r.weight, 11.25, "2.5 değil 1.25 kg artmalı");
+  const artisYuzdesi = ((r.weight! - 10) / 10) * 100;
+  assert.ok(artisYuzdesi <= 15, `artış %${artisYuzdesi} — çok büyük`);
 });
 
-test("aynı ağırlıkta üç başarısız seans deload getirir", () => {
+// ==================================== artış yüke ve hareket tipine duyarlı
+
+test("artış mutlak yükle birlikte büyür", () => {
+  assert.equal(incrementFor(bench, 60), 2.5);
+  assert.equal(incrementFor(bench, 100), 2.5);
+  assert.equal(incrementFor(bench, 200), 5, "200 kg'da 2.5 kg gereksiz yavaş");
+});
+
+test("artış en küçük adımın altına inemez", () => {
+  // %2 x 10 kg = 0.2 kg; böyle bir plaka yok.
+  assert.equal(incrementFor(lateral, 10), 1.25);
+});
+
+test("izolasyon bileşikten yavaş ilerler", () => {
+  const compound: ExerciseTarget = { ...bench, minStep: 1.25 };
+  const isolation: ExerciseTarget = { ...bench, minStep: 1.25, type: "isolation" };
+  assert.ok(incrementFor(compound, 100) >= incrementFor(isolation, 100));
+});
+
+// ================================================================ takılma
+
+test("üç seans alt uca ulaşılamazsa deload", () => {
   const stalled = [
     session("s3", [[60, 7], [60, 6], [60, 6]]),
     session("s2", [[60, 7], [60, 7], [60, 5]]),
     session("s1", [[60, 6], [60, 6], [60, 6]]),
   ];
-  const result = prescribe(target, stalled);
-  assert.equal(result.decision, "deload");
-  assert.equal(result.weight, 55); // 60 * 0.9 = 54 -> en yakın plakaya 55
+  const r = prescribe(bench, stalled);
+  assert.equal(r.decision, "deload");
+  assert.equal(r.weight, 55);
+  assert.equal(r.reps, 8);
 });
 
 test("iki başarısız seans henüz deload getirmez", () => {
-  const result = prescribe(target, [
+  const r = prescribe(bench, [
     session("s2", [[60, 7], [60, 6], [60, 6]]),
     session("s1", [[60, 7], [60, 7], [60, 5]]),
   ]);
-  assert.equal(result.decision, "repeat");
+  assert.equal(r.decision, "repeat");
+  assert.equal(r.weight, 60);
+});
+
+test("tekrar eklenen seans takılma sayacını sıfırlar", () => {
+  // Ağırlık sabit ama alt uç tutturulmuş: bu takılma değil, ilerleme.
+  const r = prescribe(bench, [
+    session("s3", [[60, 7], [60, 6], [60, 6]]),
+    session("s2", [[60, 9], [60, 9], [60, 9]]),
+    session("s1", [[60, 8], [60, 8], [60, 8]]),
+  ]);
+  assert.equal(r.decision, "repeat", "deload olmamalı");
 });
 
 test("takılma sayımı ağırlık değiştiğinde sıfırlanır", () => {
-  // En yeni seans 60 kg'da başarısız, ama ondan öncekiler farklı ağırlıkta.
-  const result = prescribe(target, [
+  const r = prescribe(bench, [
     session("s3", [[60, 7], [60, 6], [60, 6]]),
-    session("s2", [[57.5, 8], [57.5, 8], [57.5, 8]]),
-    session("s1", [[55, 8], [55, 8], [55, 8]]),
+    session("s2", [[57.5, 12], [57.5, 12], [57.5, 12]]),
+    session("s1", [[55, 12], [55, 12], [55, 12]]),
   ]);
-  assert.equal(result.decision, "repeat");
+  assert.equal(r.decision, "repeat");
 });
 
-test("deload ağırlığı artış adımının altına düşmez", () => {
-  const light: ExerciseTarget = { name: "Curl", targetSets: 3, targetReps: 10 };
-  const result = prescribe(light, [
-    session("s3", [[2.5, 4]]),
-    session("s2", [[2.5, 4]]),
-    session("s1", [[2.5, 4]]),
+test("deload en küçük adımın altına inmez", () => {
+  const light: ExerciseTarget = { ...lateral, minStep: 1.25 };
+  const r = prescribe(light, [
+    session("s3", [[1.25, 4]]), session("s2", [[1.25, 4]]), session("s1", [[1.25, 4]]),
   ]);
-  assert.equal(result.decision, "deload");
-  assert.ok(result.weight !== null && result.weight >= 2.5);
+  assert.ok(r.weight !== null && r.weight >= 1.25);
 });
+
+// ================================================================== genel
 
 test("ısınma setleri çalışma ağırlığını düşürmez", () => {
-  // 40 ve 50 kg ısınma, 60 kg çalışma ağırlığı.
-  const result = prescribe(target, [
-    session("s1", [[40, 10], [50, 8], [60, 8], [60, 8], [60, 8]]),
+  const r = prescribe(bench, [
+    session("s1", [[40, 15], [50, 12], [60, 12], [60, 12], [60, 12]]),
   ]);
-  assert.equal(result.decision, "progress");
-  assert.equal(result.weight, 62.5);
+  assert.equal(r.decision, "add-weight");
+  assert.equal(r.weight, 62.5);
+});
+
+test("hedef set sayısına ulaşılamazsa üst uç sayılmaz", () => {
+  const r = prescribe(bench, [session("s1", [[60, 12], [60, 12]])]);
+  assert.notEqual(r.decision, "add-weight");
 });
 
 test("boş setli seanslar yok sayılır", () => {
-  const result = prescribe(target, [session("empty", []), session("s1", [[60, 8], [60, 8], [60, 8]])]);
-  assert.equal(result.decision, "progress");
-  assert.equal(result.weight, 62.5);
+  const r = prescribe(bench, [
+    session("empty", []),
+    session("s1", [[60, 12], [60, 12], [60, 12]]),
+  ]);
+  assert.equal(r.decision, "add-weight");
 });
 
-test("plaka yuvarlaması", () => {
-  assert.equal(roundToPlate(54), 55);
-  assert.equal(roundToPlate(53.7), 52.5); // 52.5'e uzaklık 1.2, 55'e 1.3
-  assert.equal(roundToPlate(51), 50);
-  assert.equal(roundToPlate(53.8), 55);
+test("sabit tekrar hedefi (minReps === maxReps) hâlâ çalışır", () => {
+  const fixed: ExerciseTarget = { ...bench, minReps: 5, maxReps: 5 };
+  const r = prescribe(fixed, [session("s1", [[100, 5], [100, 5], [100, 5]])]);
+  assert.equal(r.decision, "add-weight");
+  assert.equal(r.weight, 102.5);
 });
 
-test("normalize: büyük/küçük harf ve Türkçe karakter farkı geçmişi bölmez", () => {
-  const variants = ["Bench Press", "bench press", "BENCH PRESS", "  Bench   Press  "];
-  const keys = new Set(variants.map(normalizeExerciseName));
-  assert.equal(keys.size, 1, "tüm varyantlar aynı anahtara inmeli");
+test("adım çıkarımı: alt vücut bileşikleri daha büyük plakalarla çalışır", () => {
+  assert.equal(inferMinStep("Back Squat"), 5);
+  assert.equal(inferMinStep("Ölü Kaldırma"), 5);
+  assert.equal(inferMinStep("Bench Press"), 2.5);
+  assert.equal(inferMinStep("Uydurma Hareket"), 2.5);
 });
 
-test("normalize: Türkçe karakterler sadeleşir", () => {
-  assert.equal(normalizeExerciseName("Göğüs Presi"), normalizeExerciseName("gogus presi"));
-  assert.equal(normalizeExerciseName("Ölü Kaldırma"), normalizeExerciseName("OLU KALDIRMA"));
+test("adıma yuvarlama", () => {
+  assert.equal(roundToStep(54, 2.5), 55);
+  assert.equal(roundToStep(53.7, 2.5), 52.5);
+  assert.equal(roundToStep(10.4, 1.25), 10);
 });
 
-test("normalize: farklı hareketler aynı anahtara inmez", () => {
-  assert.notEqual(normalizeExerciseName("Bench Press"), normalizeExerciseName("Leg Press"));
-  // Bilinen sınır: kısaltma eşleşmesi normalizasyonun kapsamı dışında.
+test("normalize: varyantlar aynı anahtara iner", () => {
+  const keys = new Set(
+    ["Bench Press", "bench press", "BENCH PRESS", "  Bench   Press  "]
+      .map(normalizeExerciseName)
+  );
+  assert.equal(keys.size, 1);
+  assert.equal(
+    normalizeExerciseName("Göğüs Presi"),
+    normalizeExerciseName("gogus presi")
+  );
   assert.notEqual(normalizeExerciseName("Bench"), normalizeExerciseName("Bench Press"));
 });

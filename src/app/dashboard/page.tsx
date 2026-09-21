@@ -4,6 +4,7 @@ import { Plus, Dumbbell } from "lucide-react";
 import { requireUser, displayName } from "@/lib/dal";
 import { getRoutines, getWeeklyVolume } from "@/lib/queries";
 import BottomNav from "@/components/navigation/BottomNav";
+import FeedbackButton from "@/components/feedback/FeedbackButton";
 import RoutineList from "@/components/dashboard/RoutineList";
 
 export default async function DashboardPage() {
@@ -60,6 +61,7 @@ export default async function DashboardPage() {
           </div>
         </div>
       </div>
+      <FeedbackButton />
       <BottomNav />
     </div>
   );

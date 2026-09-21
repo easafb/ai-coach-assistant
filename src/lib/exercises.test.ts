@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import {
   EXERCISE_CATALOG,
   findExercise,
-  catalogIncrement,
+  catalogMinStep,
   searchExercises,
 } from "./exercises.ts";
 import { normalizeExerciseName } from "./progression.ts";
@@ -38,16 +38,30 @@ test("kısaltmalar kanonik harekete çözülüyor", () => {
 
 test("katalogda olmayan hareket undefined döner", () => {
   assert.equal(findExercise("Uydurma Hareket"), undefined);
-  assert.equal(catalogIncrement("Uydurma Hareket"), undefined);
+  assert.equal(catalogMinStep("Uydurma Hareket"), undefined);
 });
 
-test("artış adımı katalogdan kesin geliyor", () => {
-  assert.equal(catalogIncrement("Back Squat"), 5);
-  assert.equal(catalogIncrement("Deadlift"), 5);
-  assert.equal(catalogIncrement("Hip Thrust"), 5);
-  assert.equal(catalogIncrement("Bench Press"), 2.5);
-  // Leg curl alt vücut ama izolasyon: ad çıkarımı 5 derdi, katalog 2.5 diyor.
-  assert.equal(catalogIncrement("Leg Curl"), 2.5);
+test("en küçük adım katalogdan kesin geliyor", () => {
+  assert.equal(catalogMinStep("Back Squat"), 5);
+  assert.equal(catalogMinStep("Deadlift"), 5);
+  assert.equal(catalogMinStep("Bench Press"), 2.5);
+  // Hafif izolasyonlar mikro plakayla ilerleyebilir; bildirilen sorun buydu.
+  assert.equal(catalogMinStep("Lateral Raise"), 1.25);
+  assert.equal(catalogMinStep("Barbell Curl"), 1.25);
+});
+
+test("hareket tipi katalogda tanımlı", () => {
+  assert.equal(findExercise("Back Squat")?.type, "compound");
+  assert.equal(findExercise("Bench Press")?.type, "compound");
+  assert.equal(findExercise("Lateral Raise")?.type, "isolation");
+  assert.equal(findExercise("Leg Curl")?.type, "isolation");
+});
+
+test("her katalog kaydının tipi ve adımı var", () => {
+  for (const ex of EXERCISE_CATALOG) {
+    assert.ok(["compound", "isolation"].includes(ex.type), `${ex.name}: tip yok`);
+    assert.ok([1.25, 2.5, 5].includes(ex.minStep), `${ex.name}: adım geçersiz`);
+  }
 });
 
 test("arama kısaltma ve Türkçe karakterle çalışıyor", () => {
@@ -59,6 +73,21 @@ test("arama kısaltma ve Türkçe karakterle çalışıyor", () => {
 
 test("arama tam eşleşmeyi öne alıyor", () => {
   assert.equal(searchExercises("bench press")[0].name, "Bench Press");
+});
+
+test("şablonlarda tekrar aralıkları tutarlı", () => {
+  for (const template of ROUTINE_TEMPLATES) {
+    for (const routine of template.routines) {
+      for (const ex of routine.exercises) {
+        assert.ok(ex.minReps >= 1, `${ex.name}: alt uç geçersiz`);
+        assert.ok(
+          ex.maxReps >= ex.minReps,
+          `${ex.name}: üst uç (${ex.maxReps}) alt ucun (${ex.minReps}) altında`
+        );
+        assert.ok(ex.sets >= 1 && ex.sets <= 20, `${ex.name}: set sayısı geçersiz`);
+      }
+    }
+  }
 });
 
 test("şablonlardaki her egzersiz katalogda var", () => {
@@ -77,4 +106,30 @@ test("şablonlardaki her egzersiz katalogda var", () => {
 test("şablon id'leri benzersiz", () => {
   const ids = ROUTINE_TEMPLATES.map((t) => t.id);
   assert.equal(new Set(ids).size, ids.length);
+});
+
+test("şablonlarda bileşikler sabit tekrar, izolasyonlar aralık kullanır", () => {
+  for (const template of ROUTINE_TEMPLATES) {
+    for (const routine of template.routines) {
+      for (const ex of routine.exercises) {
+        const known = findExercise(ex.name);
+        if (!known) continue;
+
+        if (known.type === "compound") {
+          // Bileşikte hedefi tutturunca ağırlık artmalı; aralık bunu geciktirir.
+          assert.equal(
+            ex.minReps,
+            ex.maxReps,
+            `${ex.name} bileşik ama aralık kullanıyor (${ex.minReps}-${ex.maxReps})`
+          );
+        } else {
+          // İzolasyonda sabit tekrar, orantısız ağırlık sıçramasına yol açar.
+          assert.ok(
+            ex.maxReps > ex.minReps,
+            `${ex.name} izolasyon ama sabit tekrar kullanıyor`
+          );
+        }
+      }
+    }
+  }
 });

@@ -11,7 +11,10 @@ export interface RoutineExercise {
   routine_id: string;
   exercise_name: string;
   default_sets: number;
-  default_reps: number;
+  /** Tekrar aralığının alt ucu. */
+  min_reps: number;
+  /** Üst uç: tüm setler buraya ulaşınca ağırlık artar. */
+  max_reps: number;
   order_index: number;
 }
 
@@ -35,7 +38,8 @@ export interface SetLog {
 export interface ExerciseDraft {
   name: string;
   sets: number;
-  reps: number;
+  minReps: number;
+  maxReps: number;
 }
 
 // Server Action'ların ortak dönüş tipi. Çağıran taraf hatayı görmezden
