@@ -396,6 +396,12 @@ export async function getRoutine(routineId: string): Promise<Routine | null> {
   return (data as Routine | null) ?? null;
 }
 
+/**
+ * Yarım kalmış bir seansın "devam edilebilir" sayılacağı süre.
+ * Dünkü yarım antrenmana bugün devam etmek yanlış olur.
+ */
+export const RESUME_WINDOW_HOURS = 6;
+
 export interface OpenSession {
   sessionId: string;
   startedAt: string;
@@ -416,7 +422,7 @@ export interface OpenSession {
  */
 export async function getOpenSession(
   routineId: string,
-  maxAgeHours = 6
+  maxAgeHours = RESUME_WINDOW_HOURS
 ): Promise<OpenSession | null> {
   const user = await requireUser();
   const supabase = await createClient();
@@ -452,4 +458,84 @@ export async function getOpenSession(
     startedAt: session.start_time as string,
     setCounts,
   };
+}
+
+
+export interface RoutineWithState extends Routine {
+  /** Bu rutinde devam edilebilir yarım antrenman varsa bilgisi. */
+  openSession: { startedAt: string; setCount: number } | null;
+}
+
+/**
+ * Rutinler + her birinde yarım kalmış antrenman olup olmadığı.
+ *
+ * Panelde yarım kalan antrenmanın görünür olması gerekiyor: kullanıcının
+ * birden fazla programı olduğunda hangisinin yarım kaldığını karta girmeden
+ * anlamanın yolu yoktu.
+ *
+ * Rutin başına ayrı sorgu atmıyoruz; açık seanslar tek seferde çekilip
+ * bellekte eşleştiriliyor.
+ */
+export async function getRoutinesWithState(): Promise<RoutineWithState[]> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data: routines, error } = await supabase
+    .from("routines")
+    .select("id, name, created_at")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  if (!routines || routines.length === 0) return [];
+
+  const since = new Date(
+    Date.now() - RESUME_WINDOW_HOURS * 3_600_000
+  ).toISOString();
+
+  const { data: sessions } = await supabase
+    .from("workout_sessions")
+    .select("id, routine_id, start_time")
+    .eq("user_id", user.id)
+    .is("end_time", null)
+    .gte("start_time", since)
+    .order("start_time", { ascending: false });
+
+  const open = new Map<string, { id: string; startedAt: string }>();
+  for (const session of sessions ?? []) {
+    const routineId = session.routine_id as string | null;
+    // Aynı rutinde birden fazla açık seans varsa en yenisi geçerli.
+    if (routineId && !open.has(routineId)) {
+      open.set(routineId, {
+        id: session.id as string,
+        startedAt: session.start_time as string,
+      });
+    }
+  }
+
+  const setCounts = new Map<string, number>();
+  if (open.size > 0) {
+    const { data: logs } = await supabase
+      .from("set_logs")
+      .select("session_id")
+      .in("session_id", [...open.values()].map((s) => s.id));
+
+    for (const log of logs ?? []) {
+      const id = log.session_id as string;
+      setCounts.set(id, (setCounts.get(id) ?? 0) + 1);
+    }
+  }
+
+  return (routines as Routine[]).map((routine) => {
+    const session = open.get(routine.id);
+    return {
+      ...routine,
+      openSession: session
+        ? {
+            startedAt: session.startedAt,
+            setCount: setCounts.get(session.id) ?? 0,
+          }
+        : null,
+    };
+  });
 }

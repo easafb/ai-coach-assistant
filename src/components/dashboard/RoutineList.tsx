@@ -2,14 +2,14 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Play, Calendar, ChevronRight, Trash2, Pencil } from "lucide-react";
+import { Play, Calendar, ChevronRight, Trash2, Pencil, RotateCw } from "lucide-react";
 
 import { deleteRoutineAction } from "@/app/actions/workoutActions";
 import TemplatePicker from "@/components/dashboard/TemplatePicker";
-import type { Routine } from "@/types";
+import type { RoutineWithState } from "@/lib/queries";
 
-export default function RoutineList({ routines }: { routines: Routine[] }) {
-  const [pendingDelete, setPendingDelete] = useState<Routine | null>(null);
+export default function RoutineList({ routines }: { routines: RoutineWithState[] }) {
+  const [pendingDelete, setPendingDelete] = useState<RoutineWithState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -61,20 +61,54 @@ export default function RoutineList({ routines }: { routines: Routine[] }) {
 
             <Link
               href={`/workout/${routine.id}`}
-              className="relative block overflow-hidden rounded-3xl border border-neutral-800 bg-neutral-900 p-6 transition-all hover:border-blue-500/50"
+              className={`relative block overflow-hidden rounded-3xl border p-6 transition-all ${
+                routine.openSession
+                  ? "border-amber-500/40 bg-amber-950/20 hover:border-amber-500/70"
+                  : "border-neutral-800 bg-neutral-900 hover:border-blue-500/50"
+              }`}
             >
               <div className="relative z-10">
                 <h3 className="mb-1 pr-24 text-xl font-bold">{routine.name}</h3>
-                <p className="mb-4 flex items-center gap-1 text-sm text-neutral-500">
-                  <Calendar size={14} />
-                  {new Date(routine.created_at).toLocaleDateString("tr-TR")}
-                </p>
-                <span className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-sm font-bold text-black transition-colors group-hover:bg-blue-500 group-hover:text-white">
-                  <Play size={16} fill="currentColor" /> Başlat
+
+                {/* Yarım kalan antrenman panelden görünmeliydi: birden fazla
+                    programı olan kullanıcı hangisinin yarım kaldığını karta
+                    girmeden anlayamıyordu. */}
+                {routine.openSession ? (
+                  <p className="mb-4 flex items-center gap-1.5 text-sm font-semibold text-amber-400">
+                    <RotateCw size={14} />
+                    Yarım kaldı · {routine.openSession.setCount} set kayıtlı
+                  </p>
+                ) : (
+                  <p className="mb-4 flex items-center gap-1 text-sm text-neutral-500">
+                    <Calendar size={14} />
+                    {new Date(routine.created_at).toLocaleDateString("tr-TR")}
+                  </p>
+                )}
+
+                <span
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
+                    routine.openSession
+                      ? "bg-amber-500 text-black"
+                      : "bg-white text-black group-hover:bg-blue-500 group-hover:text-white"
+                  }`}
+                >
+                  {routine.openSession ? (
+                    <>
+                      <RotateCw size={16} /> Devam Et
+                    </>
+                  ) : (
+                    <>
+                      <Play size={16} fill="currentColor" /> Başlat
+                    </>
+                  )}
                 </span>
               </div>
               <ChevronRight
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-800 transition-all group-hover:text-blue-500/30"
+                className={`absolute right-4 top-1/2 -translate-y-1/2 transition-all ${
+                  routine.openSession
+                    ? "text-amber-500/20"
+                    : "text-neutral-800 group-hover:text-blue-500/30"
+                }`}
                 size={48}
               />
             </Link>

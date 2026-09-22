@@ -12,6 +12,7 @@ import {
   ArrowLeftRight,
   Ban,
   HelpCircle,
+  RotateCw,
 } from "lucide-react";
 
 import {
@@ -178,13 +179,17 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
     return (
       <main className="min-h-dvh bg-[#050505] p-6 text-white">
         <div className="mx-auto max-w-md py-10">
-          <Dumbbell className="mb-6 text-blue-500" size={40} />
+          {openSession ? (
+            <RotateCw className="mb-6 text-amber-500" size={40} />
+          ) : (
+            <Dumbbell className="mb-6 text-blue-500" size={40} />
+          )}
           <h1 className="mb-1 text-3xl font-black tracking-tighter">
-            {openSession ? "Yarım kalan antrenman" : "Bugünün planı"}
+            {openSession ? "Antrenmana devam et" : "Bugünün planı"}
           </h1>
           <p className="mb-8 text-sm text-neutral-500">
             {openSession
-              ? `${loggedSoFar} set kaydetmişsin. Kaldığın yerden devam edebilirsin.`
+              ? `Bu antrenmanda ${loggedSoFar} set kaydetmişsin. Kaldığın yerden sürdür.`
               : "Geçmiş antrenmanlarına göre hazırlandı."}
           </p>
 
@@ -288,14 +293,22 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
             <button
               onClick={handleStart}
               disabled={isPending}
-              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 py-5 text-lg font-black disabled:opacity-50"
+              className={`flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl py-5 text-lg font-black disabled:opacity-50 ${
+                openSession ? "bg-amber-500 text-black" : "bg-blue-600 text-white"
+              }`}
             >
               {isPending ? (
                 <Loader2 size={20} className="animate-spin" />
+              ) : openSession ? (
+                <RotateCw size={20} />
               ) : (
                 <Play size={20} fill="currentColor" />
               )}
-              {isPending ? "Başlatılıyor..." : "Antrenmanı Başlat"}
+              {isPending
+                ? "Yükleniyor..."
+                : openSession
+                  ? "Devam Et"
+                  : "Antrenmanı Başlat"}
             </button>
           )}
         </div>
