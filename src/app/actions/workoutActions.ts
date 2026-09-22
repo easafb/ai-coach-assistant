@@ -169,14 +169,23 @@ export async function updateRoutineAction(
 // ==========================================
 // Antrenman oturumu başlatma
 // ==========================================
+/** Yarım kalmış bir seansın "devam edilebilir" sayılacağı süre (saat). */
+const RESUME_WINDOW_HOURS = 6;
+
+/**
+ * Antrenman oturumu başlatır veya yarım kalmışa devam eder.
+ *
+ * Uygulama arkadan kapatıldığında seans end_time = null olarak kalıyordu ve
+ * geçmiş, hacim ve ilerleme motoru bitmemiş seansları filtrelediği için o
+ * antrenman -kaydedilen setler dahil- hiç yapılmamış sayılıyordu.
+ */
 export async function startWorkoutAction(
   routineId: string
-): Promise<ActionResult<{ sessionId: string }>> {
+): Promise<ActionResult<{ sessionId: string; resumed: boolean }>> {
   const user = await requireUser();
   const supabase = await createClient();
 
   // Rutin adını istemciden almıyoruz; sahibi doğrulanmış kaydın adını kullanıyoruz.
-  // Eski kod sabit "Active Session" yazdığı için geçmiş ekranı hep aynı adı gösteriyordu.
   const { data: routine, error: routineError } = await supabase
     .from("routines")
     .select("name")
@@ -187,6 +196,30 @@ export async function startWorkoutAction(
   if (routineError) return dbFail("startWorkout.lookup", routineError);
   if (!routine) return fail("Rutin bulunamadı.");
 
+  const { data: open } = await supabase
+    .from("workout_sessions")
+    .select("id, start_time")
+    .eq("user_id", user.id)
+    .eq("routine_id", routineId)
+    .is("end_time", null)
+    .order("start_time", { ascending: false });
+
+  const cutoff = Date.now() - RESUME_WINDOW_HOURS * 3_600_000;
+  const resumable = (open ?? []).find(
+    (s) => new Date(s.start_time as string).getTime() >= cutoff
+  );
+
+  // Devam edilemeyecek kadar eskimiş seansları burada kapatıyoruz. Aksi halde
+  // sonsuza kadar açık kalır ve içlerindeki setler hiçbir yerde görünmez.
+  const stale = (open ?? []).filter((s) => s.id !== resumable?.id);
+  for (const session of stale) {
+    await closeSession(session.id as string, user.id);
+  }
+
+  if (resumable) {
+    return ok({ sessionId: resumable.id as string, resumed: true });
+  }
+
   const { data, error } = await supabase
     .from("workout_sessions")
     .insert([{ user_id: user.id, routine_id: routineId, routine_name: routine.name }])
@@ -195,7 +228,35 @@ export async function startWorkoutAction(
 
   if (error) return dbFail("startWorkout.insert", error);
   if (!data) return fail("Antrenman başlatılamadı.");
-  return ok({ sessionId: data.id as string });
+  return ok({ sessionId: data.id as string, resumed: false });
+}
+
+/**
+ * Bir seansı kapatır ve hacmini kaydedilmiş setlerden hesaplar.
+ * finishWorkoutAction ile aynı mantık; terk edilmiş seansları kapatmak için
+ * de kullanılıyor.
+ */
+async function closeSession(sessionId: string, userId: string): Promise<void> {
+  const supabase = await createClient();
+
+  const { data: sets } = await supabase
+    .from("set_logs")
+    .select("weight, reps")
+    .eq("session_id", sessionId);
+
+  const raw = (sets ?? []).reduce(
+    (sum, set) => sum + Number(set.weight ?? 0) * Number(set.reps ?? 0),
+    0
+  );
+
+  await supabase
+    .from("workout_sessions")
+    .update({
+      end_time: new Date().toISOString(),
+      total_volume: Math.round(raw * 100) / 100,
+    })
+    .eq("id", sessionId)
+    .eq("user_id", userId);
 }
 
 // ==========================================

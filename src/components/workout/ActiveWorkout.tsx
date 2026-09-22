@@ -21,6 +21,8 @@ import {
 } from "@/app/actions/workoutActions";
 import type { ProgressionDecision } from "@/lib/progression";
 import type { WorkoutPlanItem } from "@/lib/adjustments";
+import type { OpenSession } from "@/lib/queries";
+import { normalizeExerciseName } from "@/lib/progression";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import RestTimer, { DEFAULT_REST } from "@/components/workout/RestTimer";
 import ExerciseClassifier from "@/components/routines/ExerciseClassifier";
@@ -28,6 +30,8 @@ import ExerciseClassifier from "@/components/routines/ExerciseClassifier";
 interface Props {
   routineId: string;
   plan: WorkoutPlanItem[];
+  /** Yarım kalmış antrenman varsa devam edilebilsin diye. */
+  openSession: OpenSession | null;
 }
 
 const DECISION_LABEL: Record<ProgressionDecision, string> = {
@@ -46,7 +50,7 @@ const DECISION_STYLE: Record<ProgressionDecision, string> = {
   deload: "bg-orange-100 text-orange-700",
 };
 
-export default function ActiveWorkout({ routineId, plan }: Props) {
+export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
   const router = useRouter();
 
   // Atlanan hareketler seansın dışında; plan ekranında yine de gösteriliyorlar.
@@ -58,7 +62,20 @@ export default function ActiveWorkout({ routineId, plan }: Props) {
   const [seconds, setSeconds] = useState(0);
   const [weight, setWeight] = useState("");
   const [reps, setReps] = useState("");
-  const [setsByExercise, setSetsByExercise] = useState<Record<string, number>>({});
+  /**
+   * Devam edilen antrenmanda daha önce kaydedilmiş setler geri yükleniyor;
+   * yoksa ilerleme noktaları sıfırdan başlar ve kullanıcı setleri iki kez
+   * yaptığını sanır.
+   */
+  const [setsByExercise, setSetsByExercise] = useState<Record<string, number>>(() => {
+    if (!openSession) return {};
+    const counts: Record<string, number> = {};
+    for (const item of plan) {
+      const logged = openSession.setCounts[normalizeExerciseName(item.performedName)];
+      if (logged) counts[item.exerciseId] = logged;
+    }
+    return counts;
+  });
   const [error, setError] = useState<string | null>(null);
   const [classifying, setClassifying] = useState<string | null>(null);
   // Set kaydedilince artan sayaç; RestTimer bunu görünce baştan başlıyor.
@@ -78,6 +95,8 @@ export default function ActiveWorkout({ routineId, plan }: Props) {
   }, [hasStarted]);
 
   const weightInput = useRef<HTMLInputElement>(null);
+
+  const loggedSoFar = Object.values(setsByExercise).reduce((a, b) => a + b, 0);
 
   // Egzersize geçişte alanları reçeteyle dolduruyoruz; effect yerine index'in
   // fiilen değiştiği yerde yapıyoruz ki ardışık render tetiklenmesin.
@@ -160,9 +179,13 @@ export default function ActiveWorkout({ routineId, plan }: Props) {
       <main className="min-h-dvh bg-[#050505] p-6 text-white">
         <div className="mx-auto max-w-md py-10">
           <Dumbbell className="mb-6 text-blue-500" size={40} />
-          <h1 className="mb-1 text-3xl font-black tracking-tighter">Bugünün planı</h1>
+          <h1 className="mb-1 text-3xl font-black tracking-tighter">
+            {openSession ? "Yarım kalan antrenman" : "Bugünün planı"}
+          </h1>
           <p className="mb-8 text-sm text-neutral-500">
-            Geçmiş antrenmanlarına göre hazırlandı.
+            {openSession
+              ? `${loggedSoFar} set kaydetmişsin. Kaldığın yerden devam edebilirsin.`
+              : "Geçmiş antrenmanlarına göre hazırlandı."}
           </p>
 
           <ul className="stagger-children mb-8 space-y-3">

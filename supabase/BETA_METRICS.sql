@@ -122,3 +122,39 @@ where not exists (
 )
 group by re.exercise_name
 order by kac_kullanicida desc;
+
+
+-- --------------------------------------------------------------------------
+-- 7. YARIM KALAN SEANSLAR
+--
+-- Uygulama arkadan kapatıldığında seans end_time = null kalıyor. Geçmiş,
+-- hacim ve ilerleme motoru bitmemiş seansları filtrelediği için içlerindeki
+-- setler hiçbir yerde görünmüyor.
+--
+-- Artık startWorkoutAction 6 saatten yeni olanlara DEVAM EDİYOR, eskimiş
+-- olanları da o rutin bir daha başlatıldığında kapatıyor. Bu sorgu, hiç
+-- tekrar açılmayan rutinlerde kalanları gösterir.
+-- --------------------------------------------------------------------------
+select
+  s.id,
+  s.routine_name,
+  s.start_time,
+  round(extract(epoch from (now() - s.start_time)) / 3600) as kac_saat_once,
+  count(l.id) as kayitli_set,
+  coalesce(sum(l.weight * l.reps), 0) as gorunmeyen_hacim
+from public.workout_sessions s
+left join public.set_logs l on l.session_id = s.id
+where s.end_time is null
+group by s.id, s.routine_name, s.start_time
+order by s.start_time desc;
+
+-- Elle kapatmak istersen (hacim setlerden hesaplanır):
+--
+--   update public.workout_sessions s
+--   set end_time = now(),
+--       total_volume = coalesce((
+--         select sum(l.weight * l.reps) from public.set_logs l
+--         where l.session_id = s.id
+--       ), 0)
+--   where s.end_time is null
+--     and s.start_time < now() - interval '12 hours';
