@@ -53,20 +53,7 @@ export async function createRoutineAction(
   const trimmedName = name.trim();
   if (!trimmedName) return fail("Rutin adı boş olamaz.");
 
-  const cleaned = exercises
-    .map((ex) => {
-      const minReps = Math.max(1, Math.min(100, Math.trunc(ex.minReps) || 1));
-      // Üst uç alt ucun altına düşemez.
-      const maxReps = Math.max(minReps, Math.min(100, Math.trunc(ex.maxReps) || minReps));
-      return {
-        name: ex.name.trim(),
-        sets: Math.max(1, Math.min(20, Math.trunc(ex.sets) || 0)),
-        minReps,
-        maxReps,
-      };
-    })
-    .filter((ex) => ex.name.length > 0);
-
+  const cleaned = cleanExercises(exercises);
   if (cleaned.length === 0) return fail("En az bir egzersiz eklemelisin.");
 
   const { data: routine, error: routineError } = await supabase
@@ -81,21 +68,9 @@ export async function createRoutineAction(
       : fail("Rutin oluşturulamadı.");
   }
 
-  const { error: exerciseError } = await supabase.from("routine_exercises").insert(
-    cleaned.map((ex, index) => ({
-      routine_id: routine.id,
-      exercise_name: ex.name,
-      default_sets: ex.sets,
-      min_reps: ex.minReps,
-      max_reps: ex.maxReps,
-      // default_reps artık okunmuyor (007 ile min_reps/max_reps geldi) ama
-      // kolon eski şemadan kalma ve NOT NULL olabilir. Doldurmaya devam
-      // ediyoruz: aksi halde rutin oluşturma sessizce patlar ve bu, yeni
-      // kullanıcının yaptığı ilk iştir.
-      default_reps: ex.minReps,
-      order_index: index,
-    }))
-  );
+  const { error: exerciseError } = await supabase
+    .from("routine_exercises")
+    .insert(exerciseRows(routine.id as string, cleaned));
 
   if (exerciseError) {
     // Alt egzersizler yazılamadıysa yarım rutin bırakmıyoruz.
@@ -105,6 +80,90 @@ export async function createRoutineAction(
 
   revalidatePath("/dashboard");
   return ok({ routineId: routine.id as string });
+}
+
+/** İstemciden gelen egzersizleri sınırlara çeker ve boş olanları eler. */
+function cleanExercises(exercises: ExerciseDraft[]) {
+  return exercises
+    .map((ex) => {
+      const minReps = Math.max(1, Math.min(100, Math.trunc(ex.minReps) || 1));
+      // Üst uç alt ucun altına düşemez.
+      const maxReps = Math.max(minReps, Math.min(100, Math.trunc(ex.maxReps) || minReps));
+      return {
+        name: ex.name.trim(),
+        sets: Math.max(1, Math.min(20, Math.trunc(ex.sets) || 0)),
+        minReps,
+        maxReps,
+      };
+    })
+    .filter((ex) => ex.name.length > 0);
+}
+
+/** routine_exercises satırlarını hazırlar. */
+function exerciseRows(routineId: string, cleaned: ReturnType<typeof cleanExercises>) {
+  return cleaned.map((ex, index) => ({
+    routine_id: routineId,
+    exercise_name: ex.name,
+    default_sets: ex.sets,
+    min_reps: ex.minReps,
+    max_reps: ex.maxReps,
+    // default_reps artık okunmuyor (007 ile min_reps/max_reps geldi) ama
+    // kolon eski şemadan kalma ve NOT NULL olabilir. Doldurmaya devam
+    // ediyoruz: aksi halde rutin yazma sessizce patlar.
+    default_reps: ex.minReps,
+    order_index: index,
+  }));
+}
+
+// ==========================================
+// Rutin güncelleme
+// ==========================================
+export async function updateRoutineAction(
+  routineId: string,
+  name: string,
+  exercises: ExerciseDraft[]
+): Promise<ActionResult> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const trimmedName = name.trim();
+  if (!trimmedName) return fail("Rutin adı boş olamaz.");
+
+  const cleaned = cleanExercises(exercises);
+  if (cleaned.length === 0) return fail("En az bir egzersiz eklemelisin.");
+
+  // Sahiplik doğrulaması: update'in user_id filtresi olsa da, egzersizleri
+  // silmeden önce rutinin gerçekten bu kullanıcıya ait olduğundan emin oluyoruz.
+  const { data: owned, error: ownerError } = await supabase
+    .from("routines")
+    .update({ name: trimmedName })
+    .eq("id", routineId)
+    .eq("user_id", user.id)
+    .select("id")
+    .maybeSingle();
+
+  if (ownerError) return dbFail("updateRoutine.name", ownerError);
+  if (!owned) return fail("Bu rutine erişim yetkin yok.");
+
+  // Egzersizleri sil-yeniden yaz. Hiçbir tablo routine_exercises'a yabancı
+  // anahtarla bağlı değil ve geçmiş set_logs'ta hareket ADIYLA tutuluyor,
+  // dolayısıyla bu işlem geçmişi etkilemiyor.
+  const { error: deleteError } = await supabase
+    .from("routine_exercises")
+    .delete()
+    .eq("routine_id", routineId);
+
+  if (deleteError) return dbFail("updateRoutine.clear", deleteError);
+
+  const { error: insertError } = await supabase
+    .from("routine_exercises")
+    .insert(exerciseRows(routineId, cleaned));
+
+  if (insertError) return dbFail("updateRoutine.insert", insertError);
+
+  revalidatePath("/dashboard");
+  revalidatePath(`/workout/${routineId}`);
+  return ok(null);
 }
 
 // ==========================================

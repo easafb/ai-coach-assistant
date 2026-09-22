@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Play, Calendar, ChevronRight, Trash2 } from "lucide-react";
+import { Play, Calendar, ChevronRight, Trash2, Pencil } from "lucide-react";
 
 import { deleteRoutineAction } from "@/app/actions/workoutActions";
 import TemplatePicker from "@/components/dashboard/TemplatePicker";
@@ -37,23 +37,34 @@ export default function RoutineList({ routines }: { routines: Routine[] }) {
       <div className="stagger-children grid grid-cols-1 gap-4 md:grid-cols-2">
         {routines.map((routine) => (
           <div key={routine.id} className="group relative">
-            <button
-              onClick={() => {
-                setError(null);
-                setPendingDelete(routine);
-              }}
-              className="absolute right-4 top-4 z-20 p-2 text-neutral-600 opacity-0 transition-colors hover:text-red-500 focus-visible:opacity-100 group-hover:opacity-100"
-              aria-label={`${routine.name} rutinini sil`}
-            >
-              <Trash2 size={20} />
-            </button>
+            {/* Dokunmatikte hover yok; bu yüzden butonlar mobilde her zaman
+                görünür, imleçli cihazlarda karta gelince beliriyor. */}
+            <div className="absolute right-3 top-3 z-20 flex gap-1 opacity-100 transition-opacity md:opacity-0 md:focus-within:opacity-100 md:group-hover:opacity-100">
+              <Link
+                href={`/routines/${routine.id}/edit`}
+                className="flex h-11 w-11 items-center justify-center rounded-xl text-neutral-500 transition-colors hover:text-white"
+                aria-label={`${routine.name} rutinini düzenle`}
+              >
+                <Pencil size={18} />
+              </Link>
+              <button
+                onClick={() => {
+                  setError(null);
+                  setPendingDelete(routine);
+                }}
+                className="flex h-11 w-11 items-center justify-center rounded-xl text-neutral-500 transition-colors hover:text-red-500"
+                aria-label={`${routine.name} rutinini sil`}
+              >
+                <Trash2 size={18} />
+              </button>
+            </div>
 
             <Link
               href={`/workout/${routine.id}`}
               className="relative block overflow-hidden rounded-3xl border border-neutral-800 bg-neutral-900 p-6 transition-all hover:border-blue-500/50"
             >
               <div className="relative z-10">
-                <h3 className="mb-1 text-xl font-bold">{routine.name}</h3>
+                <h3 className="mb-1 pr-24 text-xl font-bold">{routine.name}</h3>
                 <p className="mb-4 flex items-center gap-1 text-sm text-neutral-500">
                   <Calendar size={14} />
                   {new Date(routine.created_at).toLocaleDateString("tr-TR")}

@@ -22,6 +22,7 @@ import {
 import type { ProgressionDecision } from "@/lib/progression";
 import type { WorkoutPlanItem } from "@/lib/adjustments";
 import { useWakeLock } from "@/hooks/useWakeLock";
+import RestTimer, { DEFAULT_REST } from "@/components/workout/RestTimer";
 import ExerciseClassifier from "@/components/routines/ExerciseClassifier";
 
 interface Props {
@@ -60,6 +61,9 @@ export default function ActiveWorkout({ routineId, plan }: Props) {
   const [setsByExercise, setSetsByExercise] = useState<Record<string, number>>({});
   const [error, setError] = useState<string | null>(null);
   const [classifying, setClassifying] = useState<string | null>(null);
+  // Set kaydedilince artan sayaç; RestTimer bunu görünce baştan başlıyor.
+  const [restTick, setRestTick] = useState(0);
+  const [restSeconds, setRestSeconds] = useState(0);
   const [isPending, startTransition] = useTransition();
 
   const hasStarted = sessionId !== null;
@@ -130,6 +134,9 @@ export default function ActiveWorkout({ routineId, plan }: Props) {
         const id = active[index].exerciseId;
         setSetsByExercise((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
         setReps(String(active[index].prescription.reps));
+        // Dinlenme süresi hareket tipinden geliyor; bileşikler daha uzun.
+        setRestSeconds(DEFAULT_REST[active[index].exerciseType]);
+        setRestTick((t) => t + 1);
         weightInput.current?.focus();
       } else {
         setError(result.error);
@@ -282,7 +289,11 @@ export default function ActiveWorkout({ routineId, plan }: Props) {
   const targetReached = doneSets >= targetSets;
 
   return (
-    <main className="min-h-dvh bg-[#050505] p-6 text-white">
+    <main
+      className={`min-h-dvh bg-[#050505] p-6 text-white ${
+        restTick > 0 ? "pb-40" : ""
+      }`}
+    >
       <div className="mx-auto max-w-2xl">
         <div className="mb-10 flex items-center justify-between rounded-3xl border border-neutral-800 bg-neutral-900/50 p-6">
           <div>
@@ -449,6 +460,14 @@ export default function ActiveWorkout({ routineId, plan }: Props) {
           )}
         </div>
       </div>
+
+      {restTick > 0 && (
+        <RestTimer
+          key={restTick}
+          seconds={restSeconds}
+          onDismiss={() => setRestTick(0)}
+        />
+      )}
     </main>
   );
 }
