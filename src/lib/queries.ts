@@ -91,20 +91,90 @@ export async function getWorkoutHistory(): Promise<WorkoutSession[]> {
   return (data ?? []) as WorkoutSession[];
 }
 
+export interface SessionSummary extends WorkoutSession {
+  /** Kaydedilen set sayısı. */
+  setCount: number;
+  /**
+   * Antrenmanın süresi (saniye).
+   *
+   * İlk setten son sete kadar geçen süreden hesaplanıyor, start_time'dan
+   * değil: yarım kalan bir antrenmana saatler sonra devam edildiğinde
+   * start_time ile end_time arasındaki fark aradaki boşluğu da içeriyor ve
+   * "5 saat 12 dakika antrenman yaptın" gibi saçma bir sonuç çıkıyor.
+   */
+  durationSeconds: number | null;
+  /** Aynı programın bir önceki antrenmanındaki hacim; yoksa null. */
+  previousVolume: number | null;
+}
+
 export async function getSessionSummary(
   sessionId: string
-): Promise<WorkoutSession | null> {
+): Promise<SessionSummary | null> {
   const user = await requireUser();
   const supabase = await createClient();
 
   const { data } = await supabase
     .from("workout_sessions")
-    .select("id, routine_name, total_volume, start_time, end_time")
+    .select("id, routine_id, routine_name, total_volume, start_time, end_time")
     .eq("id", sessionId)
     .eq("user_id", user.id)
     .maybeSingle();
 
-  return (data as WorkoutSession | null) ?? null;
+  if (!data) return null;
+
+  const { data: logs } = await supabase
+    .from("set_logs")
+    .select("logged_at")
+    .eq("session_id", sessionId)
+    .order("logged_at", { ascending: true });
+
+  const setCount = logs?.length ?? 0;
+
+  let durationSeconds: number | null = null;
+  if (logs && logs.length >= 2) {
+    const first = new Date(logs[0].logged_at as string).getTime();
+    const last = new Date(logs[logs.length - 1].logged_at as string).getTime();
+    durationSeconds = Math.round((last - first) / 1000);
+  } else if (data.start_time && data.end_time) {
+    durationSeconds = Math.round(
+      (new Date(data.end_time as string).getTime() -
+        new Date(data.start_time as string).getTime()) /
+        1000
+    );
+  }
+
+  // Aynı programın bir önceki tamamlanmış antrenmanı. Kalori gibi
+  // hesaplanamayan bir değer uydurmak yerine, ölçülmüş bir kıyas veriyoruz.
+  let previousVolume: number | null = null;
+  const routineId = data.routine_id as string | null;
+  if (routineId && data.end_time) {
+    const { data: previous } = await supabase
+      .from("workout_sessions")
+      .select("total_volume")
+      .eq("user_id", user.id)
+      .eq("routine_id", routineId)
+      .not("end_time", "is", null)
+      .lt("end_time", data.end_time as string)
+      .order("end_time", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (previous && previous.total_volume !== null) {
+      previousVolume = Number(previous.total_volume);
+    }
+  }
+
+  return {
+    id: data.id as string,
+    routine_name: (data.routine_name as string | null) ?? null,
+    total_volume:
+      data.total_volume === null ? null : Number(data.total_volume),
+    start_time: data.start_time as string,
+    end_time: (data.end_time as string | null) ?? null,
+    setCount,
+    durationSeconds,
+    previousVolume,
+  };
 }
 
 /**

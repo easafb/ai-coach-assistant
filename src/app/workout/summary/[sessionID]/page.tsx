@@ -1,8 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Trophy, ArrowRight, Activity } from "lucide-react";
+import { Trophy, ArrowRight, Activity, Timer, Layers, TrendingUp } from "lucide-react";
 
 import { getSessionSummary } from "@/lib/queries";
+
+/** "1s 12dk" ya da "42dk 08sn" biçiminde okunur süre. */
+function formatDuration(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}s ${m}dk`;
+  if (m > 0) return `${m}dk ${String(s).padStart(2, "0")}sn`;
+  return `${s}sn`;
+}
 
 export default async function WorkoutSummaryPage({
   params,
@@ -11,12 +21,22 @@ export default async function WorkoutSummaryPage({
 }) {
   const { sessionID } = await params;
 
-  // Hacim artık query string'den değil veritabanından geliyor.
-  // Eski hali ?volume=... okuyordu; URL'i elle değiştiren istediği sayıyı görebiliyordu.
   const session = await getSessionSummary(sessionID);
   if (!session) notFound();
 
   const volume = session.total_volume ?? 0;
+
+  /*
+   * Kalori bilerek gösterilmiyor. Ağırlık antrenmanında harcanan kalori
+   * elimizdeki veriyle hesaplanamaz: vücut ağırlığı, yaş, nabız ve dinlenme
+   * oranları gerekir. Yaygın formüller (MET x kilo x süre) sabit tempolu
+   * kardiyo için tasarlanmış ve aralıklı ağırlık çalışmasında ciddi sapıyor.
+   * Uydurma bir sayı göstermek yerine ölçülmüş bir kıyas veriyoruz.
+   */
+  const delta =
+    session.previousVolume && session.previousVolume > 0
+      ? Math.round(((volume - session.previousVolume) / session.previousVolume) * 100)
+      : null;
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-black p-6 text-white">
@@ -47,15 +67,48 @@ export default async function WorkoutSummaryPage({
               </span>
               <span className="text-xl font-bold text-slate-400">kg</span>
             </div>
-            <p className="mt-2 text-xs font-medium text-slate-500">
+            <p className="mt-1 text-xs font-medium text-slate-500">
               Bu seansta kaldırdığın toplam hacim
             </p>
+
+            {delta !== null && (
+              <p
+                className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ${
+                  delta >= 0
+                    ? "bg-emerald-500/10 text-emerald-400"
+                    : "bg-amber-500/10 text-amber-400"
+                }`}
+              >
+                <TrendingUp size={13} className={delta < 0 ? "rotate-180" : ""} />
+                Geçen sefere göre {delta >= 0 ? "+" : ""}
+                {delta}%
+              </p>
+            )}
+
+            <div className="mt-6 grid grid-cols-2 gap-3 border-t border-white/5 pt-6">
+              <div>
+                <p className="mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  <Timer size={12} /> Süre
+                </p>
+                <p className="font-mono text-xl font-bold">
+                  {session.durationSeconds !== null
+                    ? formatDuration(session.durationSeconds)
+                    : "—"}
+                </p>
+              </div>
+              <div>
+                <p className="mb-1 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                  <Layers size={12} /> Set
+                </p>
+                <p className="font-mono text-xl font-bold">{session.setCount}</p>
+              </div>
+            </div>
           </div>
         </div>
 
         <Link
           href="/dashboard"
-          className="group flex w-full items-center justify-center gap-3 rounded-[2rem] bg-white py-5 text-lg font-black text-black transition-all hover:scale-[1.02] active:scale-95"
+          className="group flex min-h-12 w-full items-center justify-center gap-3 rounded-[2rem] bg-white py-5 text-lg font-black text-black transition-all hover:scale-[1.02] active:scale-95"
         >
           Panele dön
           <ArrowRight className="transition-transform group-hover:translate-x-1" size={20} />
