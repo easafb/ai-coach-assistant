@@ -45,6 +45,7 @@ export default async function WorkoutPage({
         // yoksa motor addan çıkarım yapar.
         minStep: resolve(exercise.exercise_name)?.minStep,
         type: resolve(exercise.exercise_name)?.type,
+        unit: resolve(exercise.exercise_name)?.unit,
       },
       history[key] ?? []
     );
@@ -63,6 +64,7 @@ export default async function WorkoutPage({
       minReps: exercise.min_reps,
       maxReps: exercise.max_reps,
       exerciseType: resolve(exercise.exercise_name)?.type ?? "compound",
+      unit: resolve(exercise.exercise_name)?.unit ?? "reps",
       classified: resolve(exercise.exercise_name) !== undefined,
       prescription: adjusted,
     };

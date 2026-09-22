@@ -553,6 +553,7 @@ export async function dismissAdjustmentAction(
 const MUSCLE_GROUPS: MuscleGroup[] = ["göğüs", "sırt", "omuz", "kol", "bacak", "karın"];
 const EXERCISE_TYPES: ExerciseType[] = ["compound", "isolation"];
 const ALLOWED_STEPS = [1.25, 2.5, 5];
+const ALLOWED_UNITS = ["reps", "seconds"];
 
 /**
  * Katalogda olmayan bir hareketi sınıflandırarak kullanıcının kişisel
@@ -563,6 +564,7 @@ export async function createCustomExerciseAction(
   name: string,
   group: string,
   type: string,
+  unit: string,
   minStep: number
 ): Promise<ActionResult<{ name: string }>> {
   const user = await requireUser();
@@ -577,6 +579,9 @@ export async function createCustomExerciseAction(
   if (!EXERCISE_TYPES.includes(type as ExerciseType)) {
     return fail("Geçersiz hareket tipi.");
   }
+  if (!ALLOWED_UNITS.includes(unit)) {
+    return fail("Geçersiz ölçü birimi.");
+  }
   if (!ALLOWED_STEPS.includes(minStep)) {
     return fail("Geçersiz artış adımı.");
   }
@@ -589,6 +594,7 @@ export async function createCustomExerciseAction(
       exercise_name: trimmed,
       muscle_group: group,
       exercise_type: type,
+      unit,
       min_step: minStep,
       // 005'ten kalan kolon; NOT NULL olabileceği için dolduruyoruz.
       increment: minStep,

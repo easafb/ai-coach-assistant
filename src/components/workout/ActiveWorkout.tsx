@@ -348,9 +348,13 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
                     : "— kg"}
                   <span className="text-neutral-600"> × </span>
                   {item.targetSets} × {item.prescription.reps}
+                  {item.unit === "seconds" && (
+                    <span className="text-neutral-500"> sn</span>
+                  )}
                   {item.maxReps > item.minReps && (
                     <span className="ml-2 text-xs font-medium text-neutral-500">
-                      (aralık {item.minReps}-{item.maxReps})
+                      (aralık {item.minReps}-{item.maxReps}
+                      {item.unit === "seconds" ? " sn" : ""})
                     </span>
                   )}
                 </p>
@@ -449,6 +453,8 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
   const targetSets = current.targetSets;
   const totalSets = Object.values(setsByExercise).reduce((a, b) => a + b, 0);
   const targetReached = doneSets >= targetSets;
+  // Plank gibi izometrik duruşlar süreyle ölçülüyor; etiketler buna uymalı.
+  const isTimed = current.unit === "seconds";
 
   return (
     <main
@@ -568,7 +574,7 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
                 htmlFor="reps"
                 className="mb-1 block text-[10px] font-black uppercase text-neutral-400"
               >
-                Tekrar
+                {isTimed ? "Süre (sn)" : "Tekrar"}
               </label>
               <input
                 id="reps"

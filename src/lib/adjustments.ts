@@ -19,6 +19,7 @@ import {
   catalogResolver,
   type ExerciseResolver,
   type ExerciseType,
+  type ExerciseUnit,
 } from "./exercises.ts";
 
 export type AdjustmentAction = "reduce_load" | "swap" | "skip";
@@ -198,6 +199,8 @@ export interface WorkoutPlanItem {
    * bileşik hareketler daha uzun toparlanma gerektiriyor.
    */
   exerciseType: ExerciseType;
+  /** Tekrarla mı süreyle mi ölçülüyor; arayüz etiketleri buna göre. */
+  unit: ExerciseUnit;
   /**
    * Hareket katalogda ya da kullanıcının kendi kayıtlarında tanımlı mı?
    * Değilse artış adımı tahmine düşüyor ve AI ona ikame öneremiyor.

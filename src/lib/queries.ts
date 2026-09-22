@@ -308,7 +308,7 @@ export async function getCustomExercises(): Promise<CustomExercise[]> {
 
   const { data } = await supabase
     .from("custom_exercises")
-    .select("exercise_key, exercise_name, muscle_group, exercise_type, min_step")
+    .select("exercise_key, exercise_name, muscle_group, exercise_type, unit, min_step")
     .eq("user_id", user.id);
 
   if (!data) return [];
@@ -318,6 +318,7 @@ export async function getCustomExercises(): Promise<CustomExercise[]> {
     name: row.exercise_name as string,
     group: row.muscle_group as CustomExercise["group"],
     type: row.exercise_type as CustomExercise["type"],
+    unit: (row.unit as CustomExercise["unit"]) ?? "reps",
     minStep: Number(row.min_step),
   }));
 }

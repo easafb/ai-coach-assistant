@@ -5,6 +5,7 @@ import {
   EXERCISE_CATALOG,
   findExercise,
   catalogMinStep,
+  catalogResolver,
   searchExercises,
 } from "./exercises.ts";
 import { normalizeExerciseName } from "./progression.ts";
@@ -129,6 +130,34 @@ test("şablonlarda bileşikler sabit tekrar, izolasyonlar aralık kullanır", ()
             `${ex.name} izolasyon ama sabit tekrar kullanıyor`
           );
         }
+      }
+    }
+  }
+});
+
+test("izometrik duruşlar süreyle ölçülüyor", () => {
+  // "3 x 1-5 tekrar plank" anlamsız bir hedefti.
+  for (const name of ["Plank", "Side Plank", "Hollow Hold", "Dead Bug"]) {
+    assert.equal(findExercise(name)?.unit, "seconds", `${name} süre olmalı`);
+  }
+});
+
+test("kaldırma hareketleri tekrarla ölçülüyor", () => {
+  for (const name of ["Bench Press", "Back Squat", "Lateral Raise"]) {
+    assert.equal(catalogResolver(name)?.unit, "reps", `${name} tekrar olmalı`);
+  }
+});
+
+test("şablonlarda süre bazlı hedefler makul aralıkta", () => {
+  for (const template of ROUTINE_TEMPLATES) {
+    for (const routine of template.routines) {
+      for (const ex of routine.exercises) {
+        if (findExercise(ex.name)?.unit !== "seconds") continue;
+        // Saniye hedefi tekrar gibi tek haneli olmamalı.
+        assert.ok(
+          ex.minReps >= 15,
+          `${ex.name}: ${ex.minReps} sn hedefi tekrar gibi görünüyor`
+        );
       }
     }
   }

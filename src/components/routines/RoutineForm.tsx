@@ -74,6 +74,10 @@ export default function RoutineForm({
       prev.map((ex, i) => {
         if (i !== index) return ex;
         if (!known) return { ...ex, name: picked };
+        // Süreyle ölçülen hareketlerde tekrar varsayılanları anlamsız olurdu.
+        if (known.unit === "seconds") {
+          return { ...ex, name: picked, minReps: "30", maxReps: "60" };
+        }
         return known.type === "compound"
           ? { ...ex, name: picked, minReps: "8", maxReps: "8" }
           : { ...ex, name: picked, minReps: "10", maxReps: "15" };
@@ -224,7 +228,11 @@ export default function RoutineForm({
                   </div>
                   <div className="flex-1">
                     <label className="text-[10px] font-bold uppercase text-slate-500">
-                      {ex.minReps === ex.maxReps ? "Tekrar" : "Tekrar aralığı"}
+                      {findExercise(ex.name)?.unit === "seconds"
+                        ? "Süre (sn)"
+                        : ex.minReps === ex.maxReps
+                          ? "Tekrar"
+                          : "Tekrar aralığı"}
                     </label>
                     <div className="flex items-center gap-1">
                       <input

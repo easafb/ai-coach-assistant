@@ -267,7 +267,7 @@ test("sınıflandırılmamış harekette hafifletme ve atlama yine çalışır",
 
 test("sınıflandırılan kullanıcı hareketi ikame alabilir", () => {
   const resolve = createResolver([
-    { exerciseKey: "aaa", name: "AAA", group: "göğüs", type: "compound", minStep: 2.5 },
+    { exerciseKey: "aaa", name: "AAA", group: "göğüs", type: "compound", unit: "reps", minStep: 2.5 },
   ]);
   const result = validateAdjustments(
     [{ exercise: "AAA", action: "swap", substitute: "Dumbbell Bench Press", reason: "Omuz." }],
@@ -281,7 +281,7 @@ test("sınıflandırılan kullanıcı hareketi ikame alabilir", () => {
 
 test("kullanıcı hareketi yanlış kas grubuna ikame edilemez", () => {
   const resolve = createResolver([
-    { exerciseKey: "aaa", name: "AAA", group: "bacak", type: "compound", minStep: 5 },
+    { exerciseKey: "aaa", name: "AAA", group: "bacak", type: "compound", unit: "reps", minStep: 5 },
   ]);
   const result = validateAdjustments(
     [{ exercise: "AAA", action: "swap", substitute: "Dumbbell Bench Press", reason: "Diz." }],
@@ -294,7 +294,7 @@ test("kullanıcı hareketi yanlış kas grubuna ikame edilemez", () => {
 
 test("kullanıcı kaydı katalogla çakışırsa kullanıcınınki kazanır", () => {
   const resolve = createResolver([
-    { exerciseKey: "bench press", name: "Bench Press", group: "göğüs", type: "compound", minStep: 5 },
+    { exerciseKey: "bench press", name: "Bench Press", group: "göğüs", type: "compound", unit: "reps", minStep: 5 },
   ]);
   assert.equal(resolve("Bench Press")?.minStep, 5);
   assert.equal(resolve("Bench Press")?.custom, true);

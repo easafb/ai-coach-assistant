@@ -19,6 +19,10 @@
 export interface TemplateExercise {
   name: string;
   sets: number;
+  /**
+   * Alt/üst uç. Süreyle ölçülen hareketlerde (Plank) bunlar SANİYE,
+   * diğerlerinde tekrar sayısı.
+   */
   /** Tekrar aralığının alt ucu. */
   minReps: number;
   /** Üst uç: tüm setler buraya ulaşınca ağırlık artar. */
@@ -121,7 +125,7 @@ export const ROUTINE_TEMPLATES: RoutineTemplate[] = [
           { name: "Back Squat", sets: 3, minReps: 5, maxReps: 5 },
           { name: "Bench Press", sets: 3, minReps: 5, maxReps: 5 },
           { name: "Barbell Row", sets: 3, minReps: 8, maxReps: 8 },
-          { name: "Plank", sets: 3, minReps: 1, maxReps: 5 },
+          { name: "Plank", sets: 3, minReps: 30, maxReps: 60 },
         ],
       },
       {

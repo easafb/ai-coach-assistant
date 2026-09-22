@@ -28,11 +28,20 @@ export type MuscleGroup =
  */
 export type ExerciseType = "compound" | "isolation";
 
+/**
+ * Hareketin ölçü birimi.
+ * Plank gibi izometrik duruşlar tekrarla değil SÜREYLE ölçülür; "3 x 1-5
+ * tekrar plank" anlamsız bir hedef.
+ */
+export type ExerciseUnit = "reps" | "seconds";
+
 export interface CatalogExercise {
   /** Kanonik ad — veritabanına bu yazılır. */
   name: string;
   group: MuscleGroup;
   type: ExerciseType;
+  /** Tekrarla mı süreyle mi ölçülüyor. Belirtilmezse "reps". */
+  unit?: ExerciseUnit;
   /**
    * Salonda fiilen yapılabilen en küçük ağırlık artışı.
    * Barbell hareketlerde 2.5 kg (iki yana 1.25'er), hafif izolasyonlarda
@@ -106,7 +115,7 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   { name: "Good Morning", group: "bacak", type: "compound", minStep: 2.5, aliases: ["goodmorning"] },
 
   // ----------------------------------------------------------------- karın
-  { name: "Plank", group: "karın", type: "isolation", minStep: 2.5, aliases: ["plank", "tahta"] },
+  { name: "Plank", group: "karın", type: "isolation", unit: "seconds", minStep: 2.5, aliases: ["plank", "tahta"] },
   { name: "Hanging Leg Raise", group: "karın", type: "isolation", minStep: 2.5, aliases: ["leg raise", "bacak kaldırma"] },
   { name: "Cable Crunch", group: "karın", type: "isolation", minStep: 1.25, aliases: ["crunch", "mekik"] },
   { name: "Ab Wheel", group: "karın", type: "isolation", minStep: 2.5, aliases: ["ab roller", "karın tekeri"] },
@@ -179,9 +188,9 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   { name: "Sit Up", group: "karın", type: "isolation", minStep: 1.25, aliases: ["sit-up", "klasik mekik"] },
   { name: "Bicycle Crunch", group: "karın", type: "isolation", minStep: 1.25, aliases: ["bisiklet mekik"] },
   { name: "Russian Twist", group: "karın", type: "isolation", minStep: 1.25, aliases: ["rus twist", "gövde dönüş"] },
-  { name: "Side Plank", group: "karın", type: "isolation", minStep: 1.25, aliases: ["yan plank"] },
-  { name: "Dead Bug", group: "karın", type: "isolation", minStep: 1.25, aliases: ["ölü böcek"] },
-  { name: "Hollow Hold", group: "karın", type: "isolation", minStep: 1.25, aliases: ["hollow"] },
+  { name: "Side Plank", group: "karın", type: "isolation", unit: "seconds", minStep: 1.25, aliases: ["yan plank"] },
+  { name: "Dead Bug", group: "karın", type: "isolation", unit: "seconds", minStep: 1.25, aliases: ["ölü böcek"] },
+  { name: "Hollow Hold", group: "karın", type: "isolation", unit: "seconds", minStep: 1.25, aliases: ["hollow"] },
   { name: "Woodchopper", group: "karın", type: "isolation", minStep: 1.25, aliases: ["odun kesme", "cable woodchop"] },
   { name: "Toes to Bar", group: "karın", type: "isolation", minStep: 2.5, aliases: ["bara ayak"] },
 ];
@@ -230,6 +239,7 @@ export interface ResolvedExercise {
   name: string;
   group: MuscleGroup;
   type: ExerciseType;
+  unit: ExerciseUnit;
   /** Salonda yapılabilen en küçük artış. Motor bunun altına inemez. */
   minStep: number;
   /** Kullanıcının kendi eklediği bir hareket mi? */
@@ -243,6 +253,7 @@ export interface CustomExercise {
   name: string;
   group: MuscleGroup;
   type: ExerciseType;
+  unit: ExerciseUnit;
   minStep: number;
 }
 
@@ -254,6 +265,7 @@ export const catalogResolver: ExerciseResolver = (name) => {
     name: found.name,
     group: found.group,
     type: found.type,
+    unit: found.unit ?? "reps",
     minStep: found.minStep,
     custom: false,
   };
@@ -275,6 +287,7 @@ export function createResolver(customs: CustomExercise[]): ExerciseResolver {
         name: custom.name,
         group: custom.group,
         type: custom.type,
+        unit: custom.unit,
         minStep: custom.minStep,
         custom: true,
       };

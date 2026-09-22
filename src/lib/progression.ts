@@ -21,7 +21,7 @@
 // en önemlisi halüsinasyon kaynaklı ağırlık sıçramasının sakatlık riski.
 // ==========================================================================
 
-import type { ExerciseType } from "./exercises.ts";
+import type { ExerciseType, ExerciseUnit } from "./exercises.ts";
 
 export interface PerformedSet {
   weight: number;
@@ -46,6 +46,12 @@ export interface ExerciseTarget {
   minStep?: number;
   /** Bileşik hareketler izolasyonlardan hızlı ilerler. */
   type?: ExerciseType;
+  /**
+   * Tekrarla mı süreyle mi ölçülüyor.
+   * Çift ilerleme mantığı ikisinde de AYNI çalışıyor -- sayıyı artır, üst
+   * uca gelince ağırlığı artır. Değişen tek şey kullanıcıya ne dendiği.
+   */
+  unit?: ExerciseUnit;
 }
 
 export type ProgressionDecision =
@@ -175,6 +181,10 @@ function reachedBottomOfRange(
 const range = (t: ExerciseTarget) =>
   t.minReps === t.maxReps ? `${t.minReps}` : `${t.minReps}-${t.maxReps}`;
 
+/** "tekrar" ya da "saniye" — gerekçe cümlelerinde kullanılıyor. */
+const unitWord = (t: ExerciseTarget) =>
+  t.unit === "seconds" ? "saniye" : "tekrar";
+
 /**
  * Bir sonraki seans için reçete üretir.
  *
@@ -192,8 +202,9 @@ export function prescribe(
       reps: target.minReps,
       decision: "first-time",
       rationale:
-        `Bu egzersizi ilk kez yapıyorsun. ${target.targetSets} set × ${range(target)} ` +
-        "tekrarı formunu bozmadan tamamlayabileceğin bir ağırlıkla başla.",
+        `Bu egzersizi ilk kez yapıyorsun. ${target.targetSets} set × ` +
+        `${range(target)} ${unitWord(target)} hedefini formunu bozmadan ` +
+        "tamamlayabileceğin bir seviyeden başla.",
       increment: target.minStep ?? inferMinStep(target.name),
     };
   }
@@ -213,8 +224,9 @@ export function prescribe(
       reps: target.minReps,
       decision: "add-weight",
       rationale:
-        `${workingWeight} kg ile ${target.targetSets} × ${target.maxReps} tekrarı ` +
-        `tamamladın — bugün ${next} kg, ${target.minReps} tekrardan başla.`,
+        `${workingWeight} kg ile ${target.targetSets} × ${target.maxReps} ` +
+        `${unitWord(target)} hedefini tamamladın — bugün ${next} kg, ` +
+        `${target.minReps} ${unitWord(target)}dan başla.`,
       increment,
     };
   }
@@ -231,8 +243,8 @@ export function prescribe(
       reps: nextReps,
       decision: "add-reps",
       rationale:
-        `${workingWeight} kg'da en zayıf setin ${weakest} tekrardı. ` +
-        `Bugün aynı ağırlıkta ${nextReps} tekrarı hedefle; ` +
+        `${workingWeight} kg'da en zayıf setin ${weakest} ${unitWord(target)}. ` +
+        `Bugün aynı ağırlıkta ${nextReps} ${unitWord(target)} hedefle; ` +
         `tüm setler ${target.maxReps}'e ulaşınca ağırlık artacak.`,
       increment,
     };
@@ -257,7 +269,8 @@ export function prescribe(
       reps: target.minReps,
       decision: "deload",
       rationale:
-        `${workingWeight} kg'da ${stalled} seans ${target.minReps} tekrara ulaşamadın. ` +
+        `${workingWeight} kg'da ${stalled} seans ${target.minReps} ${unitWord(target)} ` +
+        "hedefine ulaşamadın. " +
         `Bugün ${deloaded} kg'a inip ivmeyi geri kazanalım.`,
       increment,
     };
@@ -268,8 +281,9 @@ export function prescribe(
     reps: target.minReps,
     decision: "repeat",
     rationale:
-      `Geçen sefer ${workingWeight} kg'da en zayıf setin ${weakest} tekrardı, ` +
-      `hedef ${target.minReps}. Aynı ağırlıkta kalıp alt ucu tamamlamaya odaklan.`,
+      `Geçen sefer ${workingWeight} kg'da en zayıf setin ${weakest} ` +
+      `${unitWord(target)}, hedef ${target.minReps}. Aynı ağırlıkta kalıp ` +
+      "alt ucu tamamlamaya odaklan.",
     increment,
   };
 }
