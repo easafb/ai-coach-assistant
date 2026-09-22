@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/?error=auth`);
+    return NextResponse.redirect(`${origin}/giris?error=auth`);
   }
 
   const supabase = await createClient();
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
   if (error) {
     console.error("OAuth kod takası başarısız:", error.message);
-    return NextResponse.redirect(`${origin}/?error=auth`);
+    return NextResponse.redirect(`${origin}/giris?error=auth`);
   }
 
   // Giriş ekranındaki açık rıza, Google'a yönlendirme sırasında kaybolmasın

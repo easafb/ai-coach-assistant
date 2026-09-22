@@ -28,7 +28,7 @@ export const getSessionUser = cache(async (): Promise<User | null> => {
 // giriş ekranına yollar, dolayısıyla dönüş tipi asla null olmaz.
 export const requireUser = cache(async (): Promise<User> => {
   const user = await getSessionUser();
-  if (!user) redirect("/");
+  if (!user) redirect("/giris");
   return user;
 });
 

@@ -6,9 +6,14 @@ import { Dumbbell, Check, Loader2 } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
 
-export default function LoginScreen() {
+export default function LoginScreen({ authFailed = false }: { authFailed?: boolean }) {
   const [isRedirecting, setIsRedirecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // Callback kod takasında başarısız olursa buraya ?error=auth ile dönülüyor.
+  // Eskiden bu parametre hiç okunmuyordu; kullanıcı neden giriş ekranına
+  // geri düştüğünü anlamıyordu.
+  const [error, setError] = useState<string | null>(
+    authFailed ? "Giriş tamamlanamadı. Lütfen tekrar dene." : null
+  );
   // KVKK md. 6 ve md. 9: sağlık verisi ve yurt dışına aktarım için ayrı
   // açık rıza gerekiyor. Aydınlatma metnini okuma beyanı bunların yerine
   // geçmiyor, o yüzden üç ayrı kutu değil — iki rıza + bir bilgilendirme.

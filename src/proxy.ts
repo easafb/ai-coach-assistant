@@ -61,10 +61,10 @@ export async function proxy(request: NextRequest) {
   const isProtected = PROTECTED_PREFIXES.some((prefix) => path.startsWith(prefix));
 
   if (!user && isProtected) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(new URL("/giris", request.url));
   }
 
-  if (user && path === "/") {
+  if (user && (path === "/" || path === "/giris")) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
