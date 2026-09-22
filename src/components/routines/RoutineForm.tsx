@@ -3,17 +3,26 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Plus, Trash2, ChevronLeft } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronUp, ChevronDown, Loader2 } from "lucide-react";
 
-import { createRoutineAction } from "@/app/actions/workoutActions";
+import { createRoutineAction, updateRoutineAction } from "@/app/actions/workoutActions";
 import ExercisePicker from "@/components/routines/ExercisePicker";
 import { findExercise } from "@/lib/exercises";
+import type { ExerciseDraft } from "@/types";
 
-interface ExerciseInput {
+export interface ExerciseInput {
   name: string;
   sets: string;
   minReps: string;
   maxReps: string;
+}
+
+interface Props {
+  /** Düzenleme modunda rutinin kimliği; oluşturma modunda verilmez. */
+  routineId?: string;
+  initialName?: string;
+  initialExercises?: ExerciseInput[];
+  customKeys: string[];
 }
 
 // Tekrar aralığı: alt uçtan başlanır, tüm setler üst uca ulaşınca ağırlık artar.
@@ -24,14 +33,25 @@ const emptyExercise = (): ExerciseInput => ({
   maxReps: "12",
 });
 
-export default function NewRoutinePage({
+/**
+ * Rutin oluşturma ve düzenleme formu.
+ *
+ * İkisi tek bileşen: alanlar, doğrulama ve tekrar hedefi mantığı birebir aynı.
+ * Ayrı yazmak, birinde yapılan düzeltmenin diğerine geçmemesi demekti.
+ */
+export default function RoutineForm({
+  routineId,
+  initialName = "",
+  initialExercises,
   customKeys,
-}: {
-  customKeys: string[];
-}) {
+}: Props) {
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [exercises, setExercises] = useState<ExerciseInput[]>([emptyExercise()]);
+  const isEdit = routineId !== undefined;
+
+  const [name, setName] = useState(initialName);
+  const [exercises, setExercises] = useState<ExerciseInput[]>(
+    initialExercises?.length ? initialExercises : [emptyExercise()]
+  );
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -48,17 +68,28 @@ export default function NewRoutinePage({
    * sıçrama demek; bu hareketler önce tekrar biriktirir.
    * Kullanıcı ikisini de elle değiştirebilir.
    */
-  const pickExercise = (index: number, name: string) => {
-    const known = findExercise(name);
+  const pickExercise = (index: number, picked: string) => {
+    const known = findExercise(picked);
     setExercises((prev) =>
       prev.map((ex, i) => {
         if (i !== index) return ex;
-        if (!known) return { ...ex, name };
+        if (!known) return { ...ex, name: picked };
         return known.type === "compound"
-          ? { ...ex, name, minReps: "8", maxReps: "8" }
-          : { ...ex, name, minReps: "10", maxReps: "15" };
+          ? { ...ex, name: picked, minReps: "8", maxReps: "8" }
+          : { ...ex, name: picked, minReps: "10", maxReps: "15" };
       })
     );
+  };
+
+  /** Sürükle-bırak yerine yukarı/aşağı: dokunmatikte belirgin şekilde güvenilir. */
+  const move = (index: number, delta: number) => {
+    setExercises((prev) => {
+      const target = index + delta;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   };
 
   const handleSave = () => {
@@ -71,20 +102,19 @@ export default function NewRoutinePage({
       return;
     }
 
+    const payload: ExerciseDraft[] = exercises.map((ex) => ({
+      name: ex.name,
+      sets: Number.parseInt(ex.sets, 10) || 0,
+      minReps: Number.parseInt(ex.minReps, 10) || 0,
+      maxReps: Number.parseInt(ex.maxReps, 10) || 0,
+    }));
+
     setError(null);
     startTransition(async () => {
-      const result = await createRoutineAction(
-        name,
-        exercises.map((ex) => ({
-          name: ex.name,
-          sets: Number.parseInt(ex.sets, 10) || 0,
-          minReps: Number.parseInt(ex.minReps, 10) || 0,
-          maxReps: Number.parseInt(ex.maxReps, 10) || 0,
-        }))
-      );
+      const result = isEdit
+        ? await updateRoutineAction(routineId, name, payload)
+        : await createRoutineAction(name, payload);
 
-      // Eski kod hata durumunu tamamen yutuyordu: kayıt başarısız olsa bile
-      // kullanıcı hiçbir geri bildirim almıyordu.
       if (result.ok) router.push("/dashboard");
       else setError(result.error);
     });
@@ -96,20 +126,28 @@ export default function NewRoutinePage({
         <div className="mb-8 flex items-center justify-between">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 font-bold text-slate-400 transition-colors hover:text-white"
+            className="flex min-h-11 items-center gap-2 font-bold text-slate-400 transition-colors hover:text-white"
           >
             <ChevronLeft size={20} /> Geri
           </button>
           <Link
             href="/dashboard"
-            className="rounded-full bg-white/5 px-4 py-2 text-sm font-bold text-slate-400 transition-all hover:text-white"
+            className="flex min-h-11 items-center rounded-full bg-white/5 px-4 text-sm font-bold text-slate-400 transition-all hover:text-white"
           >
             Panel
           </Link>
         </div>
 
         <h1 className="mb-2 text-3xl font-black">
-          Yeni <span className="text-blue-500">Program</span>
+          {isEdit ? (
+            <>
+              Programı <span className="text-blue-500">Düzenle</span>
+            </>
+          ) : (
+            <>
+              Yeni <span className="text-blue-500">Program</span>
+            </>
+          )}
         </h1>
         <p className="mb-8 text-sm leading-relaxed text-slate-500">
           Tekrar hedefi hareket tipine göre kurulur. Bileşik hareketlerde tek
@@ -141,13 +179,35 @@ export default function NewRoutinePage({
                 key={index}
                 className="rounded-[2rem] border border-white/5 bg-[#1C1C1E] p-6"
               >
-                <div className="mb-4">
-                  <ExercisePicker
-                    value={ex.name}
-                    onChange={(name) => pickExercise(index, name)}
-                    customKeys={customKeys}
-                  />
+                <div className="mb-4 flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <ExercisePicker
+                      value={ex.name}
+                      onChange={(picked) => pickExercise(index, picked)}
+                      customKeys={customKeys}
+                    />
+                  </div>
+
+                  <div className="flex shrink-0 flex-col">
+                    <button
+                      onClick={() => move(index, -1)}
+                      disabled={index === 0}
+                      aria-label="Yukarı taşı"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:text-white disabled:opacity-20"
+                    >
+                      <ChevronUp size={18} />
+                    </button>
+                    <button
+                      onClick={() => move(index, 1)}
+                      disabled={index === exercises.length - 1}
+                      aria-label="Aşağı taşı"
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 transition-colors hover:text-white disabled:opacity-20"
+                    >
+                      <ChevronDown size={18} />
+                    </button>
+                  </div>
                 </div>
+
                 <div className="flex items-end gap-3">
                   <div className="w-14 shrink-0">
                     <label className="text-[10px] font-bold uppercase text-slate-500">
@@ -194,7 +254,7 @@ export default function NewRoutinePage({
                     }
                     disabled={exercises.length === 1}
                     aria-label="Egzersizi kaldır"
-                    className="pb-1 text-red-500/50 transition-colors hover:text-red-500 disabled:opacity-20"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center text-red-500/50 transition-colors hover:text-red-500 disabled:opacity-20"
                   >
                     <Trash2 size={20} />
                   </button>
@@ -205,7 +265,7 @@ export default function NewRoutinePage({
 
           <button
             onClick={() => setExercises((prev) => [...prev, emptyExercise()])}
-            className="flex w-full items-center justify-center gap-2 rounded-[2rem] border-2 border-dashed border-white/10 py-4 font-bold text-slate-400"
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-[2rem] border-2 border-dashed border-white/10 py-4 font-bold text-slate-400"
           >
             <Plus size={20} /> Egzersiz Ekle
           </button>
@@ -219,9 +279,14 @@ export default function NewRoutinePage({
           <button
             onClick={handleSave}
             disabled={isPending}
-            className="w-full rounded-[2rem] bg-blue-500 py-5 text-lg font-black text-white active:scale-95 disabled:opacity-50"
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-[2rem] bg-blue-500 py-5 text-lg font-black text-white active:scale-95 disabled:opacity-50"
           >
-            {isPending ? "Kaydediliyor..." : "Rutini Kaydet"}
+            {isPending && <Loader2 size={20} className="animate-spin" />}
+            {isPending
+              ? "Kaydediliyor..."
+              : isEdit
+                ? "Değişiklikleri Kaydet"
+                : "Rutini Kaydet"}
           </button>
         </div>
       </div>

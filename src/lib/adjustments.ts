@@ -15,7 +15,11 @@
 // ==========================================================================
 
 import { normalizeExerciseName, type Prescription } from "./progression.ts";
-import { catalogResolver, type ExerciseResolver } from "./exercises.ts";
+import {
+  catalogResolver,
+  type ExerciseResolver,
+  type ExerciseType,
+} from "./exercises.ts";
 
 export type AdjustmentAction = "reduce_load" | "swap" | "skip";
 
@@ -189,6 +193,11 @@ export interface WorkoutPlanItem {
   /** Tekrar aralığının uçları; arayüz hedefi bağlamıyla gösterebilsin diye. */
   minReps: number;
   maxReps: number;
+  /**
+   * Bileşik mi izolasyon mu. Dinlenme süresi buna göre belirleniyor:
+   * bileşik hareketler daha uzun toparlanma gerektiriyor.
+   */
+  exerciseType: ExerciseType;
   /**
    * Hareket katalogda ya da kullanıcının kendi kayıtlarında tanımlı mı?
    * Değilse artış adımı tahmine düşüyor ve AI ona ikame öneremiyor.

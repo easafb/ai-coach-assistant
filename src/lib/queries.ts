@@ -380,3 +380,18 @@ export async function getTrainingSummary(): Promise<TrainingSummary> {
     exercises: [...byExercise.values()].sort((a, b) => b.sessionCount - a.sessionCount),
   };
 }
+
+/** Tek bir rutin; sahiplik doğrulanır, başkasınınki null döner. */
+export async function getRoutine(routineId: string): Promise<Routine | null> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from("routines")
+    .select("id, name, created_at")
+    .eq("id", routineId)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  return (data as Routine | null) ?? null;
+}

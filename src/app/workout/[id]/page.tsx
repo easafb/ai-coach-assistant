@@ -58,6 +58,7 @@ export default async function WorkoutPage({
       targetSets: exercise.default_sets,
       minReps: exercise.min_reps,
       maxReps: exercise.max_reps,
+      exerciseType: resolve(exercise.exercise_name)?.type ?? "compound",
       classified: resolve(exercise.exercise_name) !== undefined,
       prescription: adjusted,
     };
