@@ -132,7 +132,9 @@ export default function PrivacyPage() {
             <p className="mt-3">
               Koç özelliğini kullandığınızda yazdığınız metin ve antrenman özetiniz
               yanıt üretilmesi için Google&apos;a iletilir. Bu veriler adınız veya
-              e-postanızla birlikte gönderilmez.
+              e-postanızla birlikte gönderilmez. Google bu verileri yapay zekâ
+              modellerini geliştirmek için kullanmaz; yalnızca kötüye kullanımı
+              tespit etmek amacıyla sınırlı bir süre saklar.
             </p>
           </section>
 
