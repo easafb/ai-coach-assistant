@@ -6,7 +6,11 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/dal";
 import { findTemplate } from "@/lib/templates";
 import { validateAdjustments, type Adjustment } from "@/lib/adjustments";
-import { getUserExerciseNames, getExerciseResolver } from "@/lib/queries";
+import {
+  getUserExerciseNames,
+  getExerciseResolver,
+  RESUME_WINDOW_HOURS,
+} from "@/lib/queries";
 import { normalizeExerciseName } from "@/lib/progression";
 import type { MuscleGroup, ExerciseType } from "@/lib/exercises";
 import type { ActionResult, ExerciseDraft } from "@/types";
@@ -169,9 +173,6 @@ export async function updateRoutineAction(
 // ==========================================
 // Antrenman oturumu başlatma
 // ==========================================
-/** Yarım kalmış bir seansın "devam edilebilir" sayılacağı süre (saat). */
-const RESUME_WINDOW_HOURS = 6;
-
 /**
  * Antrenman oturumu başlatır veya yarım kalmışa devam eder.
  *

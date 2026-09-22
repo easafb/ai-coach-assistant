@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus, Dumbbell, LayoutGrid, UserCog } from "lucide-react";
 
 import { requireConsent, displayName } from "@/lib/dal";
-import { getRoutines, getWeeklyVolume } from "@/lib/queries";
+import { getRoutinesWithState, getWeeklyVolume } from "@/lib/queries";
 import BottomNav from "@/components/navigation/BottomNav";
 import FeedbackButton from "@/components/feedback/FeedbackButton";
 import RoutineList from "@/components/dashboard/RoutineList";
@@ -13,7 +13,7 @@ export default async function DashboardPage() {
   // önce boş geliyor, sonra doluyordu.
   const [user, routines, weeklyVolume] = await Promise.all([
     requireConsent(),
-    getRoutines(),
+    getRoutinesWithState(),
     getWeeklyVolume(),
   ]);
 
