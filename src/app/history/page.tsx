@@ -2,10 +2,12 @@ import Link from "next/link";
 import { Calendar, ArrowLeft } from "lucide-react";
 
 import { getWorkoutHistory } from "@/lib/queries";
+import { requireConsent } from "@/lib/dal";
 import BottomNav from "@/components/navigation/BottomNav";
 import FeedbackButton from "@/components/feedback/FeedbackButton";
 
 export default async function HistoryPage() {
+  await requireConsent();
   const history = await getWorkoutHistory();
 
   return (

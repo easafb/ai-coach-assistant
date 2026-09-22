@@ -1,17 +1,30 @@
 "use client";
 
 import { useState } from "react";
-import { Dumbbell } from "lucide-react";
+import Link from "next/link";
+import { Dumbbell, Check } from "lucide-react";
 
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginScreen() {
   const [isRedirecting, setIsRedirecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // KVKK md. 6 ve md. 9: sağlık verisi ve yurt dışına aktarım için ayrı
+  // açık rıza gerekiyor. Aydınlatma metnini okuma beyanı bunların yerine
+  // geçmiyor, o yüzden üç ayrı kutu değil — iki rıza + bir bilgilendirme.
+  const [readPolicy, setReadPolicy] = useState(false);
+  const [consent, setConsent] = useState(false);
+
+  const canContinue = readPolicy && consent;
 
   const handleGoogleLogin = async () => {
+    if (!canContinue) return;
     setIsRedirecting(true);
     setError(null);
+
+    // Rıza, OAuth dönüşünden sonra kullanıcı kimliğiyle birlikte kaydedilecek.
+    // Google'a yönlendirme sırasında state kaybolduğu için çerezle taşıyoruz.
+    document.cookie = `pending_consent=1; path=/; max-age=600; SameSite=Lax`;
 
     const supabase = createClient();
     const { error: authError } = await supabase.auth.signInWithOAuth({
@@ -54,9 +67,66 @@ export default function LoginScreen() {
           </p>
         )}
 
+        {/* Onaylar butondan ÖNCE: kullanıcı neyi kabul ettiğini görmeden
+            giriş yapamasın. */}
+        <div className="mb-5 space-y-3 text-left">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={readPolicy}
+              onChange={(e) => setReadPolicy(e.target.checked)}
+              className="peer sr-only"
+            />
+            <span
+              aria-hidden="true"
+              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
+                readPolicy
+                  ? "border-blue-500 bg-blue-600 text-white"
+                  : "border-white/20 bg-white/5"
+              }`}
+            >
+              {readPolicy && <Check size={14} strokeWidth={3} />}
+            </span>
+            <span className="text-[13px] leading-snug text-neutral-400">
+              <Link
+                href="/gizlilik"
+                className="font-semibold text-blue-400 underline"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Aydınlatma metnini
+              </Link>{" "}
+              okudum.
+            </span>
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={consent}
+              onChange={(e) => setConsent(e.target.checked)}
+              className="peer sr-only"
+            />
+            <span
+              aria-hidden="true"
+              className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors ${
+                consent
+                  ? "border-blue-500 bg-blue-600 text-white"
+                  : "border-white/20 bg-white/5"
+              }`}
+            >
+              {consent && <Check size={14} strokeWidth={3} />}
+            </span>
+            <span className="text-[13px] leading-snug text-neutral-400">
+              Sağlık verilerimin işlenmesine ve yurt dışı sunucularına
+              aktarılmasına <strong className="text-neutral-300">açık rıza</strong>{" "}
+              gösteriyorum.
+            </span>
+          </label>
+        </div>
+
         <button
           onClick={handleGoogleLogin}
-          disabled={isRedirecting}
+          disabled={isRedirecting || !canContinue}
           className="flex w-full items-center justify-center gap-3 rounded-2xl bg-white px-8 py-4 font-bold text-black transition-all hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
         >
           <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">

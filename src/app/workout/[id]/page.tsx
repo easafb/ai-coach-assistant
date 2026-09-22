@@ -8,6 +8,7 @@ import {
 } from "@/lib/queries";
 import { prescribe, normalizeExerciseName } from "@/lib/progression";
 import { applyAdjustment, type WorkoutPlanItem } from "@/lib/adjustments";
+import { requireConsent } from "@/lib/dal";
 import ActiveWorkout from "@/components/workout/ActiveWorkout";
 
 export default async function WorkoutPage({
@@ -15,6 +16,7 @@ export default async function WorkoutPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireConsent();
   const { id } = await params;
 
   const [exercises, history, adjustments, resolve] = await Promise.all([

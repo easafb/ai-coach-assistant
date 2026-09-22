@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 
-import { requireUser } from "@/lib/dal";
+import { requireConsent } from "@/lib/dal";
 import TemplatePicker from "@/components/dashboard/TemplatePicker";
 
 /**
@@ -12,7 +12,7 @@ import TemplatePicker from "@/components/dashboard/TemplatePicker";
  * özgü bir iş değil: yeni bir bölünmeye geçen kullanıcı da ister.
  */
 export default async function TemplatesPage() {
-  await requireUser();
+  await requireConsent();
 
   return (
     <main className="min-h-dvh bg-[#050505] p-6 pb-24 text-white">

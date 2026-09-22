@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { Plus, Dumbbell, LayoutGrid } from "lucide-react";
+import { Plus, Dumbbell, LayoutGrid, UserCog } from "lucide-react";
 
-import { requireUser, displayName } from "@/lib/dal";
+import { requireConsent, displayName } from "@/lib/dal";
 import { getRoutines, getWeeklyVolume } from "@/lib/queries";
 import BottomNav from "@/components/navigation/BottomNav";
 import FeedbackButton from "@/components/feedback/FeedbackButton";
@@ -12,7 +12,7 @@ export default async function DashboardPage() {
   // Eski hali useEffect ile client'tan istek atıyordu; o yüzden sayfa
   // önce boş geliyor, sonra doluyordu.
   const [user, routines, weeklyVolume] = await Promise.all([
-    requireUser(),
+    requireConsent(),
     getRoutines(),
     getWeeklyVolume(),
   ]);
@@ -30,6 +30,13 @@ export default async function DashboardPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
+            <Link
+              href="/hesap"
+              aria-label="Hesabım"
+              className="flex min-h-12 w-12 items-center justify-center rounded-2xl border border-neutral-800 bg-neutral-900 text-slate-400 transition-all hover:border-neutral-700 hover:text-white active:scale-95"
+            >
+              <UserCog size={18} />
+            </Link>
             <Link
               href="/routines/templates"
               className="flex min-h-12 items-center gap-2 rounded-2xl border border-neutral-800 bg-neutral-900 px-5 py-3 font-bold text-slate-300 transition-all hover:border-neutral-700 hover:text-white active:scale-95"

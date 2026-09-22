@@ -1,12 +1,14 @@
 import { Sparkles } from "lucide-react";
 
 import { getActiveAdjustments } from "@/lib/queries";
+import { requireConsent } from "@/lib/dal";
 import BottomNav from "@/components/navigation/BottomNav";
 import FeedbackButton from "@/components/feedback/FeedbackButton";
 import CoachConsultation from "@/components/coach/CoachConsultation";
 import ActiveAdjustments from "@/components/coach/ActiveAdjustments";
 
 export default async function CoachPage() {
+  await requireConsent();
   const adjustments = Object.values(await getActiveAdjustments());
 
   return (

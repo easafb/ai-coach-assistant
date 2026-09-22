@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { getCustomExercises, getRoutine, getRoutineExercises } from "@/lib/queries";
+import { requireConsent } from "@/lib/dal";
 import RoutineForm from "@/components/routines/RoutineForm";
 
 export default async function EditRoutinePage({
@@ -8,6 +9,7 @@ export default async function EditRoutinePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  await requireConsent();
   const { id } = await params;
 
   const [routine, exercises, customs] = await Promise.all([

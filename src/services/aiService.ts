@@ -1,6 +1,7 @@
 "use server";
 
 import { requireUser } from "@/lib/dal";
+import { getConsent, isConsentValid } from "@/lib/consent";
 import { checkAiRateLimit, recordAiRequest } from "@/lib/rateLimit";
 import {
   getUserExerciseNames,
@@ -118,6 +119,17 @@ export async function requestCoachPlan(
 ): Promise<ActionResult<CoachPlan>> {
   // Bu bir Server Action, yani public endpoint. Auth kontrolü zorunlu.
   const user = await requireUser();
+
+  // KVKK md. 6: kullanıcının yazdığı ağrı/sakatlık bildirimi özel nitelikli
+  // kişisel veri. Açık rıza yoksa işlenemez — bu, sayfa yönlendirmesine
+  // güvenilecek bir şey değil, uç noktanın kendisinde durdurulmalı.
+  const consent = await getConsent(user.id);
+  if (!isConsentValid(consent)) {
+    return {
+      ok: false,
+      error: "Koç özelliğini kullanmak için açık rıza onayı vermen gerekiyor.",
+    };
+  }
 
   // Limit sağlayıcıya gitmeden önce kontrol ediliyor: reddedilen istek
   // hiçbir maliyet üretmemeli.
