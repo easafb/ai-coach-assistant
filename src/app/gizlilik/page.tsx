@@ -120,7 +120,9 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <strong className="text-white">Vercel</strong> — uygulamanın
-                barındırılması.
+                barındırılması ve anonim kullanım istatistikleri. Bu istatistikler
+                çerez kullanmaz; hangi sayfanın kaç kez görüntülendiğini ölçer,
+                sizi kimliğinizle ilişkilendirmez.
               </li>
               <li>
                 <strong className="text-white">Google</strong> — hesabınızla giriş
