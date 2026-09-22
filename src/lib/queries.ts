@@ -610,3 +610,27 @@ export async function getRoutinesWithState(): Promise<RoutineWithState[]> {
     };
   });
 }
+
+/**
+ * Antrenman sonrası anket gösterilmeli mi?
+ * Satır yoksa henüz sorulmamış demektir; cevaplanmış ya da geçilmişse
+ * satır vardır ve bir daha sorulmaz.
+ *
+ * Tablo okunamazsa (ör. 017 henüz uygulanmamışsa) false: anket yüzünden
+ * özet ekranı bozulmamalı.
+ */
+export async function needsSurvey(): Promise<boolean> {
+  const user = await requireUser();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[needsSurvey]", error.message);
+    return false;
+  }
+  return data === null;
+}

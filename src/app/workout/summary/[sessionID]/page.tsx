@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Trophy, ArrowRight, Activity, Timer, Layers, TrendingUp } from "lucide-react";
 
-import { getSessionSummary } from "@/lib/queries";
+import { getSessionSummary, needsSurvey } from "@/lib/queries";
+import SurveyCard from "@/components/survey/SurveyCard";
 
 /** "1s 12dk" ya da "42dk 08sn" biçiminde okunur süre. */
 function formatDuration(seconds: number): string {
@@ -21,7 +22,10 @@ export default async function WorkoutSummaryPage({
 }) {
   const { sessionID } = await params;
 
-  const session = await getSessionSummary(sessionID);
+  const [session, askSurvey] = await Promise.all([
+    getSessionSummary(sessionID),
+    needsSurvey(),
+  ]);
   if (!session) notFound();
 
   const volume = session.total_volume ?? 0;
@@ -105,6 +109,10 @@ export default async function WorkoutSummaryPage({
             </div>
           </div>
         </div>
+
+        {/* Anket kayıt anında değil burada: kullanıcı değeri gördükten sonra.
+            Cevaplanınca ya da geçilince bir daha gösterilmiyor. */}
+        {askSurvey && <SurveyCard />}
 
         <Link
           href="/dashboard"

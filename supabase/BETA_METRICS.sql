@@ -304,3 +304,44 @@ select
   count(*) filter (where name = 'workout_abandoned') as terk_edilen,
   count(*) filter (where name = 'workout_resumed')   as devam_edilen
 from public.events;
+
+
+-- ==========================================================================
+-- 10. ANKET (017)
+-- ==========================================================================
+
+-- 10a. Cevaplama oranı. Geçen çoksa anket fazla uzun ya da yanlış yerde.
+select
+  count(*) filter (where answered_at is not null)  as cevaplayan,
+  count(*) filter (where dismissed_at is not null
+                   and answered_at is null)        as gecen
+from public.user_profiles;
+
+
+-- 10b. HANGİ KANAL GERİ DÖNEN KULLANICI GETİRİYOR?
+-- "30 kişiyi nereden bulacağım" sorusunun cevabı burada: kanal başına kaç
+-- kişi geldi ve kaçı ikinci antrenmana döndü.
+with seans as (
+  select user_id, count(*) as tamamlanan
+  from public.events
+  where name = 'workout_completed'
+  group by user_id
+)
+select
+  p.source                                              as kanal,
+  count(*)                                              as kisi,
+  count(*) filter (where coalesce(s.tamamlanan, 0) >= 2) as ikinciye_donen
+from public.user_profiles p
+left join seans s using (user_id)
+where p.answered_at is not null
+group by p.source
+order by kisi desc;
+
+
+-- 10c. Hedef ve deneyim dağılımı. Motor yeni başlayanlar için mi,
+-- deneyimliler için mi daha değerli? Tutma oranıyla birlikte oku.
+select goal as hedef, experience as deneyim, count(*) as kisi
+from public.user_profiles
+where answered_at is not null
+group by 1, 2
+order by kisi desc;

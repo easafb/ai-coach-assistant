@@ -2,6 +2,14 @@
 
 import { requireUser } from "@/lib/dal";
 import { createClient } from "@/lib/supabase/server";
+import {
+  EXPERIENCES,
+  GOALS,
+  SOURCES,
+  type Experience,
+  type Goal,
+  type Source,
+} from "@/lib/survey";
 import type { ActionResult } from "@/types";
 
 /**
@@ -21,7 +29,7 @@ export async function exportUserDataAction(): Promise<
   const user = await requireUser();
   const supabase = await createClient();
 
-  const [routines, exercises, sessions, sets, adjustments, customs, feedback] =
+  const [routines, exercises, sessions, sets, adjustments, customs, feedback, profile] =
     await Promise.all([
       supabase.from("routines").select("*").eq("user_id", user.id),
       supabase
@@ -36,6 +44,7 @@ export async function exportUserDataAction(): Promise<
       supabase.from("exercise_adjustments").select("*").eq("user_id", user.id),
       supabase.from("custom_exercises").select("*").eq("user_id", user.id),
       supabase.from("feedback").select("*").eq("user_id", user.id),
+      supabase.from("user_profiles").select("*").eq("user_id", user.id).maybeSingle(),
     ]);
 
   // Rutin adlarını kimlik yerine isimle gösterebilmek için eşleme.
@@ -110,6 +119,14 @@ export async function exportUserDataAction(): Promise<
         enKucukArtisKg: Number(c.min_step),
         olusturulma: c.created_at,
       })),
+      anketCevaplarim: profile.data?.answered_at
+        ? {
+            hedef: GOALS[profile.data.goal as Goal] ?? null,
+            deneyim: EXPERIENCES[profile.data.experience as Experience] ?? null,
+            neredenDuydum: SOURCES[profile.data.source as Source] ?? null,
+            tarih: profile.data.answered_at,
+          }
+        : null,
       geriBildirimlerim: (feedback.data ?? []).map((f) => ({
         tur: f.kind === "error" ? "otomatik hata raporu" : "geri bildirim",
         mesaj: f.message,
