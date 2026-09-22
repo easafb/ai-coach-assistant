@@ -206,3 +206,63 @@ test("normalize: varyantlar aynı anahtara iner", () => {
   );
   assert.notEqual(normalizeExerciseName("Bench"), normalizeExerciseName("Bench Press"));
 });
+
+// ================================================== ağırlıksız hareketler
+// Çalışma ağırlığı 0 kg: ilerleme ağırlıkla değil tekrar/süreyle olur.
+
+const pushUp: ExerciseTarget = {
+  name: "Push Up", targetSets: 3, minReps: 8, maxReps: 15,
+  minStep: 2.5, type: "compound",
+};
+
+const plank: ExerciseTarget = {
+  name: "Plank", targetSets: 3, minReps: 30, maxReps: 60,
+  minStep: 2.5, type: "isolation", unit: "seconds",
+};
+
+test("ağırlıksız: üst uca ulaşınca ağırlık eklenmez, tekrar artmaya devam eder", () => {
+  const p = prescribe(pushUp, [session("s1", [[0, 15], [0, 15], [0, 16]])]);
+  assert.equal(p.decision, "add-reps");
+  assert.equal(p.weight, 0);
+  assert.equal(p.reps, 16);
+  assert.ok(!p.rationale.includes("kg"), p.rationale);
+});
+
+test("ağırlıksız: takılınca deload 0 kg'dan 2.5 kg'a ÇIKARMAZ", () => {
+  const stuck = [
+    session("s3", [[0, 6], [0, 5], [0, 5]]),
+    session("s2", [[0, 6], [0, 6], [0, 5]]),
+    session("s1", [[0, 7], [0, 6], [0, 5]]),
+  ];
+  const p = prescribe(pushUp, stuck);
+  assert.notEqual(p.decision, "deload");
+  assert.equal(p.weight, 0);
+  assert.equal(p.reps, pushUp.minReps);
+});
+
+test("ağırlıksız: gerekçede '0 kg' geçmez", () => {
+  const p = prescribe(pushUp, [session("s1", [[0, 10], [0, 9], [0, 9]])]);
+  assert.equal(p.decision, "add-reps");
+  assert.equal(p.reps, 10);
+  assert.ok(p.rationale.startsWith("Ağırlıksız"), p.rationale);
+  assert.ok(!p.rationale.includes("0 kg"), p.rationale);
+});
+
+test("süreli harekette adım 5 saniye", () => {
+  const p = prescribe(plank, [session("s1", [[0, 40], [0, 35], [0, 35]])]);
+  assert.equal(p.reps, 40);
+  assert.ok(p.rationale.includes("saniye"));
+});
+
+test("süreli harekette üst uç aşılınca süre uzamaya devam eder", () => {
+  const p = prescribe(plank, [session("s1", [[0, 60], [0, 60], [0, 60]])]);
+  assert.equal(p.decision, "add-reps");
+  assert.equal(p.weight, 0);
+  assert.equal(p.reps, 65);
+});
+
+test("ek ağırlık girilirse normal çift ilerleme geçerli", () => {
+  const p = prescribe(pushUp, [session("s1", [[10, 15], [10, 15], [10, 15]])]);
+  assert.equal(p.decision, "add-weight");
+  assert.equal(p.weight, 12.5);
+});

@@ -186,6 +186,17 @@ const unitWord = (t: ExerciseTarget) =>
   t.unit === "seconds" ? "saniye" : "tekrar";
 
 /**
+ * Seanslar arası tekrar/süre artışı. Plank'e her seans bir saniye eklemek
+ * anlamsız; süreyle ölçülen hareketlerde adım 5 saniye.
+ */
+const repStep = (t: ExerciseTarget) => (t.unit === "seconds" ? 5 : 1);
+
+/** "60 kg'da" / "ağırlıksız" — 0 kg cümlede "0 kg'da" diye geçmesin. */
+const atWeight = (w: number) => (w === 0 ? "ağırlıksız" : `${w} kg'da`);
+const withWeight = (w: number) => (w === 0 ? "ağırlıksız" : `${w} kg ile`);
+const capitalize = (s: string) => s.charAt(0).toLocaleUpperCase("tr") + s.slice(1);
+
+/**
  * Bir sonraki seans için reçete üretir.
  *
  * @param history En yeniden en eskiye sıralı geçmiş performanslar.
@@ -213,6 +224,49 @@ export function prescribe(
   const workingWeight = workingWeightOf(last);
   const increment = incrementFor(target, workingWeight);
 
+  const weakest = weakestSetReps(last);
+
+  /*
+   * AĞIRLIKSIZ ÇALIŞMA (çalışma ağırlığı 0 kg).
+   * Şınav, plank, barfiks gibi hareketlerde ilerleme ağırlıkla değil
+   * tekrar/süreyle olur. Bu dal olmadan motor üst uca ulaşan kişiye
+   * "bugün 2.5 kg" diyor, takılan kişiye de deload adına 0'dan 2.5 kg'a
+   * ÇIKARIYORDU. Kullanıcı kendisi ek ağırlık girerse (yelek, plaka)
+   * çalışma ağırlığı 0'dan büyük olur ve normal çift ilerleme devreye girer.
+   */
+  if (workingWeight === 0) {
+    if (reachedBottomOfRange(last, target)) {
+      const top = reachedTopOfRange(last, target);
+      // Üst uç aşıldıysa tavan yok: tekrar/süre artmaya devam eder.
+      const nextReps = top
+        ? weakest + repStep(target)
+        : Math.min(weakest + repStep(target), target.maxReps);
+      return {
+        weight: 0,
+        reps: nextReps,
+        decision: "add-reps",
+        rationale: top
+          ? `Ağırlıksız ${target.targetSets} × ${target.maxReps} ${unitWord(target)} ` +
+            `hedefini tamamladın — bugün ${nextReps} ${unitWord(target)} dene. ` +
+            "Daha zorlu bir şey istersen ek ağırlık girebilirsin."
+          : `Ağırlıksız en zayıf setin ${weakest} ${unitWord(target)}. ` +
+            `Bugün ${nextReps} ${unitWord(target)} hedefle.`,
+        increment,
+      };
+    }
+
+    return {
+      weight: 0,
+      reps: target.minReps,
+      decision: "repeat",
+      rationale:
+        `Geçen sefer en zayıf setin ${weakest} ${unitWord(target)}, hedef ` +
+        `${target.minReps}. Aynı hedefte kal; zorlanıyorsan hareketin daha ` +
+        "kolay bir çeşidiyle başlayabilirsin.",
+      increment,
+    };
+  }
+
   // 1) Aralığın üst ucu tamamlandı: ağırlık artar, tekrar alt uca döner.
   if (reachedTopOfRange(last, target)) {
     const next = roundToStep(
@@ -224,26 +278,24 @@ export function prescribe(
       reps: target.minReps,
       decision: "add-weight",
       rationale:
-        `${workingWeight} kg ile ${target.targetSets} × ${target.maxReps} ` +
+        `${capitalize(withWeight(workingWeight))} ${target.targetSets} × ${target.maxReps} ` +
         `${unitWord(target)} hedefini tamamladın — bugün ${next} kg, ` +
         `${target.minReps} ${unitWord(target)}dan başla.`,
       increment,
     };
   }
 
-  const weakest = weakestSetReps(last);
-
   // 2) Alt uç tutturuldu ama üst uca ulaşılmadı: aynı ağırlıkta tekrar ekle.
   //    Lateral raise gibi hareketlerin aylarca kaldığı yer burası, ve olması
   //    gereken de bu.
   if (reachedBottomOfRange(last, target)) {
-    const nextReps = Math.min(weakest + 1, target.maxReps);
+    const nextReps = Math.min(weakest + repStep(target), target.maxReps);
     return {
       weight: workingWeight,
       reps: nextReps,
       decision: "add-reps",
       rationale:
-        `${workingWeight} kg'da en zayıf setin ${weakest} ${unitWord(target)}. ` +
+        `${capitalize(atWeight(workingWeight))} en zayıf setin ${weakest} ${unitWord(target)}. ` +
         `Bugün aynı ağırlıkta ${nextReps} ${unitWord(target)} hedefle; ` +
         `tüm setler ${target.maxReps}'e ulaşınca ağırlık artacak.`,
       increment,
@@ -281,7 +333,7 @@ export function prescribe(
     reps: target.minReps,
     decision: "repeat",
     rationale:
-      `Geçen sefer ${workingWeight} kg'da en zayıf setin ${weakest} ` +
+      `Geçen sefer ${atWeight(workingWeight)} en zayıf setin ${weakest} ` +
       `${unitWord(target)}, hedef ${target.minReps}. Aynı ağırlıkta kalıp ` +
       "alt ucu tamamlamaya odaklan.",
     increment,

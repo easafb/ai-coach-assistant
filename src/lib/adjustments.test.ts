@@ -300,3 +300,17 @@ test("kullanıcı kaydı katalogla çakışırsa kullanıcınınki kazanır", ()
   assert.equal(resolve("Bench Press")?.custom, true);
   assert.equal(catalogResolver("Bench Press")?.minStep, 2.5);
 });
+
+test("reduce_load ağırlıksız harekete yük EKLEMEZ", () => {
+  const bodyweight: Prescription = {
+    weight: 0, reps: 12, decision: "add-reps",
+    rationale: "Ağırlıksız.", increment: 2.5,
+  };
+  const adjustment: Adjustment = {
+    exerciseKey: "push up", exerciseName: "Push Up", action: "reduce_load",
+    substituteName: null, reason: "Bilek ağrısı.", expiresAt: "2026-10-05T10:00:00Z",
+  };
+  const result = applyAdjustment("Push Up", bodyweight, adjustment);
+  assert.equal(result.weight, 0);
+  assert.ok(result.rationale.includes("Bilek ağrısı."));
+});

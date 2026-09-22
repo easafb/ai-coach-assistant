@@ -60,6 +60,22 @@ const DECISION_STYLE: Record<ProgressionDecision, string> = {
   deload: "bg-orange-100 text-orange-700",
 };
 
+/** Egzersize geçerken ağırlık alanının ilk değeri. */
+function prefillWeight(item: WorkoutPlanItem | undefined): string {
+  const w = item?.prescription.weight;
+  if (w == null) return "";
+  // Ağırlıksız harekette 0 yerine boş alan: "Yok" yer tutucusu görünür.
+  if (w === 0 && item?.bodyweight) return "";
+  return String(w);
+}
+
+/** Plan listesinde önerilen yük. */
+function formatWeight(item: WorkoutPlanItem): string {
+  const w = item.prescription.weight;
+  if (item.bodyweight && (w == null || w === 0)) return "Ağırlıksız";
+  return w != null ? `${w} kg` : "— kg";
+}
+
 export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
   const router = useRouter();
 
@@ -124,7 +140,7 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
     const clamped = Math.max(0, Math.min(active.length - 1, nextIndex));
     const item = active[clamped];
     setIndex(clamped);
-    setWeight(item?.prescription.weight != null ? String(item.prescription.weight) : "");
+    setWeight(prefillWeight(item));
     setReps(item ? String(item.prescription.reps) : "");
     setError(null);
   };
@@ -199,17 +215,23 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
   const handleLogSet = () => {
     if (!sessionId) return;
 
-    const weightNum = Number.parseFloat(weight);
+    const current = active[index];
+    // Ağırlıksız harekette boş alan "ek ağırlık yok" demek.
+    const weightNum =
+      current.bodyweight && weight.trim() === "" ? 0 : Number.parseFloat(weight);
     const repsNum = Number.parseInt(reps, 10);
 
     if (!Number.isFinite(weightNum) || !Number.isInteger(repsNum) || repsNum < 1) {
-      setError("Ağırlık ve tekrar alanlarını doldur.");
+      setError(
+        current.bodyweight
+          ? `${current.unit === "seconds" ? "Süre" : "Tekrar"} alanını doldur.`
+          : "Ağırlık ve tekrar alanlarını doldur."
+      );
       return;
     }
 
     // Fiilen yapılan hareketi logluyoruz: swap varsa ikamenin adı gider,
     // böylece geçmiş gerçekte yapılanı yansıtır.
-    const current = active[index];
     const item: PendingSet = {
       clientId: newClientId(),
       sessionId,
@@ -343,9 +365,7 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
                   </span>
                 </div>
                 <p className="mt-1 font-mono text-lg font-bold text-blue-400">
-                  {item.prescription.weight != null
-                    ? `${item.prescription.weight} kg`
-                    : "— kg"}
+                  {formatWeight(item)}
                   <span className="text-neutral-600"> × </span>
                   {item.targetSets} × {item.prescription.reps}
                   {item.unit === "seconds" && (
@@ -555,7 +575,7 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
                 htmlFor="weight"
                 className="mb-1 block text-[10px] font-black uppercase text-neutral-400"
               >
-                Ağırlık (kg)
+                {current.bodyweight ? "Ek ağırlık (kg)" : "Ağırlık (kg)"}
               </label>
               <input
                 id="weight"
@@ -564,7 +584,7 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
                 inputMode="decimal"
                 step="2.5"
                 className="w-full bg-transparent text-2xl font-bold focus:outline-none"
-                placeholder="0"
+                placeholder={current.bodyweight ? "Yok" : "0"}
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
               />

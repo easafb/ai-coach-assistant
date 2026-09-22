@@ -43,6 +43,12 @@ export interface CatalogExercise {
   /** Tekrarla mı süreyle mi ölçülüyor. Belirtilmezse "reps". */
   unit?: ExerciseUnit;
   /**
+   * Çoğunlukla ağırlıksız yapılan hareket (şınav, plank, barfiks...).
+   * Arayüzde ağırlık alanı zorunlu olmaktan çıkar, boş bırakılırsa 0 kg
+   * kaydedilir. İsteyen yine ek ağırlık girebilir (yelek, plaka).
+   */
+  bodyweight?: boolean;
+  /**
    * Salonda fiilen yapılabilen en küçük ağırlık artışı.
    * Barbell hareketlerde 2.5 kg (iki yana 1.25'er), hafif izolasyonlarda
    * mikro plaka veya küçük dambıllarla 1.25 kg mümkün.
@@ -64,8 +70,8 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   { name: "Incline Dumbbell Press", group: "göğüs", type: "compound", minStep: 2.5, aliases: ["incline db", "eğimli dumbbell"] },
   { name: "Chest Fly", group: "göğüs", type: "isolation", minStep: 1.25, aliases: ["fly", "pec deck", "kelebek", "göğüs açış"] },
   { name: "Cable Crossover", group: "göğüs", type: "isolation", minStep: 1.25, aliases: ["crossover", "kablo çapraz"] },
-  { name: "Push Up", group: "göğüs", type: "compound", minStep: 2.5, aliases: ["şınav", "pushup"] },
-  { name: "Dips", group: "göğüs", type: "compound", minStep: 2.5, aliases: ["paralel bar", "dip"] },
+  { name: "Push Up", group: "göğüs", type: "compound", minStep: 2.5, bodyweight: true, aliases: ["şınav", "pushup"] },
+  { name: "Dips", group: "göğüs", type: "compound", minStep: 2.5, bodyweight: true, aliases: ["paralel bar", "dip"] },
 
   // ------------------------------------------------------------------ sırt
   { name: "Deadlift", group: "sırt", type: "compound", minStep: 5, aliases: ["ölü kaldırma", "dl", "konvansiyonel deadlift"] },
@@ -73,8 +79,8 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   { name: "Barbell Row", group: "sırt", type: "compound", minStep: 2.5, aliases: ["bent over row", "barfiks row", "kürek", "row"] },
   { name: "Pendlay Row", group: "sırt", type: "compound", minStep: 2.5, aliases: ["pendlay"] },
   { name: "Dumbbell Row", group: "sırt", type: "compound", minStep: 2.5, aliases: ["db row", "tek kol kürek"] },
-  { name: "Pull Up", group: "sırt", type: "compound", minStep: 2.5, aliases: ["barfiks", "pullup", "çekme"] },
-  { name: "Chin Up", group: "sırt", type: "compound", minStep: 2.5, aliases: ["chinup", "ters barfiks"] },
+  { name: "Pull Up", group: "sırt", type: "compound", minStep: 2.5, bodyweight: true, aliases: ["barfiks", "pullup", "çekme"] },
+  { name: "Chin Up", group: "sırt", type: "compound", minStep: 2.5, bodyweight: true, aliases: ["chinup", "ters barfiks"] },
   { name: "Lat Pulldown", group: "sırt", type: "compound", minStep: 2.5, aliases: ["pulldown", "lat çekiş", "önden çekiş"] },
   { name: "Seated Cable Row", group: "sırt", type: "compound", minStep: 2.5, aliases: ["cable row", "oturarak kürek"] },
   { name: "T-Bar Row", group: "sırt", type: "compound", minStep: 2.5, aliases: ["tbar", "t bar"] },
@@ -107,7 +113,7 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   { name: "Leg Press", group: "bacak", type: "compound", minStep: 5, aliases: ["bacak pres", "legpress"] },
   { name: "Hack Squat", group: "bacak", type: "compound", minStep: 5, aliases: ["hack"] },
   { name: "Bulgarian Split Squat", group: "bacak", type: "compound", minStep: 2.5, aliases: ["bulgarian", "split squat", "bulgar"] },
-  { name: "Lunge", group: "bacak", type: "compound", minStep: 2.5, aliases: ["hamle", "walking lunge", "yürüyen hamle"] },
+  { name: "Lunge", group: "bacak", type: "compound", minStep: 2.5, bodyweight: true, aliases: ["hamle", "walking lunge", "yürüyen hamle"] },
   { name: "Hip Thrust", group: "bacak", type: "compound", minStep: 2.5, aliases: ["kalça thrust", "hipthrust", "kalça itiş"] },
   { name: "Leg Curl", group: "bacak", type: "isolation", minStep: 1.25, aliases: ["hamstring curl", "arka bacak"] },
   { name: "Leg Extension", group: "bacak", type: "isolation", minStep: 1.25, aliases: ["ön bacak", "extension"] },
@@ -115,10 +121,10 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   { name: "Good Morning", group: "bacak", type: "compound", minStep: 2.5, aliases: ["goodmorning"] },
 
   // ----------------------------------------------------------------- karın
-  { name: "Plank", group: "karın", type: "isolation", unit: "seconds", minStep: 2.5, aliases: ["plank", "tahta"] },
-  { name: "Hanging Leg Raise", group: "karın", type: "isolation", minStep: 2.5, aliases: ["leg raise", "bacak kaldırma"] },
+  { name: "Plank", group: "karın", type: "isolation", unit: "seconds", minStep: 2.5, bodyweight: true, aliases: ["plank", "tahta"] },
+  { name: "Hanging Leg Raise", group: "karın", type: "isolation", minStep: 2.5, bodyweight: true, aliases: ["leg raise", "bacak kaldırma"] },
   { name: "Cable Crunch", group: "karın", type: "isolation", minStep: 1.25, aliases: ["crunch", "mekik"] },
-  { name: "Ab Wheel", group: "karın", type: "isolation", minStep: 2.5, aliases: ["ab roller", "karın tekeri"] },
+  { name: "Ab Wheel", group: "karın", type: "isolation", minStep: 2.5, bodyweight: true, aliases: ["ab roller", "karın tekeri"] },
 
   // ------------------------------------------------- göğüs (ek)
   { name: "Machine Chest Press", group: "göğüs", type: "compound", minStep: 2.5, aliases: ["makine göğüs", "chest press", "göğüs makinesi"] },
@@ -128,7 +134,7 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   { name: "Incline Cable Fly", group: "göğüs", type: "isolation", minStep: 1.25, aliases: ["eğimli kablo fly", "incline fly"] },
   { name: "Low Cable Fly", group: "göğüs", type: "isolation", minStep: 1.25, aliases: ["alt kablo fly", "low fly"] },
   { name: "Weighted Dips", group: "göğüs", type: "compound", minStep: 2.5, aliases: ["ağırlıklı dips", "weighted dip"] },
-  { name: "Incline Push Up", group: "göğüs", type: "compound", minStep: 2.5, aliases: ["eğimli şınav"] },
+  { name: "Incline Push Up", group: "göğüs", type: "compound", minStep: 2.5, bodyweight: true, aliases: ["eğimli şınav"] },
 
   // -------------------------------------------------- sırt (ek)
   { name: "Sumo Deadlift", group: "sırt", type: "compound", minStep: 5, aliases: ["sumo", "sumo ölü kaldırma"] },
@@ -137,8 +143,8 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   { name: "Chest Supported Row", group: "sırt", type: "compound", minStep: 2.5, aliases: ["göğüs destekli kürek", "chest supported"] },
   { name: "Machine Row", group: "sırt", type: "compound", minStep: 2.5, aliases: ["makine kürek", "hammer row"] },
   { name: "Reverse Grip Row", group: "sırt", type: "compound", minStep: 2.5, aliases: ["ters tutuş kürek", "underhand row"] },
-  { name: "Wide Grip Pull Up", group: "sırt", type: "compound", minStep: 2.5, aliases: ["geniş barfiks", "wide pullup"] },
-  { name: "Inverted Row", group: "sırt", type: "compound", minStep: 2.5, aliases: ["ters şınav", "australian pull up"] },
+  { name: "Wide Grip Pull Up", group: "sırt", type: "compound", minStep: 2.5, bodyweight: true, aliases: ["geniş barfiks", "wide pullup"] },
+  { name: "Inverted Row", group: "sırt", type: "compound", minStep: 2.5, bodyweight: true, aliases: ["ters şınav", "australian pull up"] },
   { name: "Single Arm Lat Pulldown", group: "sırt", type: "compound", minStep: 1.25, aliases: ["tek kol pulldown"] },
   { name: "Straight Arm Pulldown", group: "sırt", type: "isolation", minStep: 1.25, aliases: ["düz kol pulldown", "straight arm"] },
   { name: "Dumbbell Pullover", group: "sırt", type: "isolation", minStep: 1.25, aliases: ["pullover"] },
@@ -163,8 +169,8 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   { name: "Cable Hammer Curl", group: "kol", type: "isolation", minStep: 1.25, aliases: ["kablo çekiç"] },
   { name: "Rope Pushdown", group: "kol", type: "isolation", minStep: 1.25, aliases: ["halat triceps", "rope triceps"] },
   { name: "Triceps Kickback", group: "kol", type: "isolation", minStep: 1.25, aliases: ["kickback", "triceps geri itiş"] },
-  { name: "Bench Dips", group: "kol", type: "compound", minStep: 2.5, aliases: ["bench dip", "sehpa dips"] },
-  { name: "Diamond Push Up", group: "kol", type: "compound", minStep: 2.5, aliases: ["elmas şınav"] },
+  { name: "Bench Dips", group: "kol", type: "compound", minStep: 2.5, bodyweight: true, aliases: ["bench dip", "sehpa dips"] },
+  { name: "Diamond Push Up", group: "kol", type: "compound", minStep: 2.5, bodyweight: true, aliases: ["elmas şınav"] },
   { name: "Wrist Curl", group: "kol", type: "isolation", minStep: 1.25, aliases: ["bilek curl", "önkol curl"] },
   { name: "Reverse Wrist Curl", group: "kol", type: "isolation", minStep: 1.25, aliases: ["ters bilek curl"] },
 
@@ -172,11 +178,11 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   { name: "Goblet Squat", group: "bacak", type: "compound", minStep: 2.5, aliases: ["goblet"] },
   { name: "Sumo Squat", group: "bacak", type: "compound", minStep: 5, aliases: ["sumo çömelme"] },
   { name: "Smith Machine Squat", group: "bacak", type: "compound", minStep: 5, aliases: ["smith squat"] },
-  { name: "Reverse Lunge", group: "bacak", type: "compound", minStep: 2.5, aliases: ["geri hamle"] },
+  { name: "Reverse Lunge", group: "bacak", type: "compound", minStep: 2.5, bodyweight: true, aliases: ["geri hamle"] },
   { name: "Step Up", group: "bacak", type: "compound", minStep: 2.5, aliases: ["step-up", "kutu çıkış"] },
   { name: "Single Leg Romanian Deadlift", group: "bacak", type: "compound", minStep: 2.5, aliases: ["tek bacak rdl"] },
-  { name: "Glute Bridge", group: "bacak", type: "compound", minStep: 5, aliases: ["kalça köprüsü"] },
-  { name: "Nordic Curl", group: "bacak", type: "isolation", minStep: 2.5, aliases: ["nordic hamstring"] },
+  { name: "Glute Bridge", group: "bacak", type: "compound", minStep: 5, bodyweight: true, aliases: ["kalça köprüsü"] },
+  { name: "Nordic Curl", group: "bacak", type: "isolation", minStep: 2.5, bodyweight: true, aliases: ["nordic hamstring"] },
   { name: "Seated Calf Raise", group: "bacak", type: "isolation", minStep: 1.25, aliases: ["oturarak baldır"] },
   { name: "Standing Calf Raise", group: "bacak", type: "isolation", minStep: 1.25, aliases: ["ayakta baldır"] },
   { name: "Leg Press Calf Raise", group: "bacak", type: "isolation", minStep: 1.25, aliases: ["leg press baldır"] },
@@ -185,14 +191,14 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   { name: "Hip Adduction", group: "bacak", type: "isolation", minStep: 1.25, aliases: ["addüksiyon", "kalça kapama"] },
 
   // ------------------------------------------------- karın (ek)
-  { name: "Sit Up", group: "karın", type: "isolation", minStep: 1.25, aliases: ["sit-up", "klasik mekik"] },
-  { name: "Bicycle Crunch", group: "karın", type: "isolation", minStep: 1.25, aliases: ["bisiklet mekik"] },
-  { name: "Russian Twist", group: "karın", type: "isolation", minStep: 1.25, aliases: ["rus twist", "gövde dönüş"] },
-  { name: "Side Plank", group: "karın", type: "isolation", unit: "seconds", minStep: 1.25, aliases: ["yan plank"] },
-  { name: "Dead Bug", group: "karın", type: "isolation", unit: "seconds", minStep: 1.25, aliases: ["ölü böcek"] },
-  { name: "Hollow Hold", group: "karın", type: "isolation", unit: "seconds", minStep: 1.25, aliases: ["hollow"] },
+  { name: "Sit Up", group: "karın", type: "isolation", minStep: 1.25, bodyweight: true, aliases: ["sit-up", "klasik mekik"] },
+  { name: "Bicycle Crunch", group: "karın", type: "isolation", minStep: 1.25, bodyweight: true, aliases: ["bisiklet mekik"] },
+  { name: "Russian Twist", group: "karın", type: "isolation", minStep: 1.25, bodyweight: true, aliases: ["rus twist", "gövde dönüş"] },
+  { name: "Side Plank", group: "karın", type: "isolation", unit: "seconds", minStep: 1.25, bodyweight: true, aliases: ["yan plank"] },
+  { name: "Dead Bug", group: "karın", type: "isolation", unit: "seconds", minStep: 1.25, bodyweight: true, aliases: ["ölü böcek"] },
+  { name: "Hollow Hold", group: "karın", type: "isolation", unit: "seconds", minStep: 1.25, bodyweight: true, aliases: ["hollow"] },
   { name: "Woodchopper", group: "karın", type: "isolation", minStep: 1.25, aliases: ["odun kesme", "cable woodchop"] },
-  { name: "Toes to Bar", group: "karın", type: "isolation", minStep: 2.5, aliases: ["bara ayak"] },
+  { name: "Toes to Bar", group: "karın", type: "isolation", minStep: 2.5, bodyweight: true, aliases: ["bara ayak"] },
 ];
 
 /** Normalize edilmiş kanonik ad -> katalog kaydı. */
@@ -240,6 +246,8 @@ export interface ResolvedExercise {
   group: MuscleGroup;
   type: ExerciseType;
   unit: ExerciseUnit;
+  /** Ağırlıksız yapılabilen hareket; ağırlık alanı isteğe bağlı. */
+  bodyweight: boolean;
   /** Salonda yapılabilen en küçük artış. Motor bunun altına inemez. */
   minStep: number;
   /** Kullanıcının kendi eklediği bir hareket mi? */
@@ -266,6 +274,7 @@ export const catalogResolver: ExerciseResolver = (name) => {
     group: found.group,
     type: found.type,
     unit: found.unit ?? "reps",
+    bodyweight: found.bodyweight ?? false,
     minStep: found.minStep,
     custom: false,
   };
@@ -288,6 +297,9 @@ export function createResolver(customs: CustomExercise[]): ExerciseResolver {
         group: custom.group,
         type: custom.type,
         unit: custom.unit,
+        // Kullanıcının kendi hareketinde bu bilgi tutulmuyor; ağırlık alanı
+        // zorunlu kalır, ağırlıksız yapıyorsa 0 yazabilir.
+        bodyweight: false,
         minStep: custom.minStep,
         custom: true,
       };
