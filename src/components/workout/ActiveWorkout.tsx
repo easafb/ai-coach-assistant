@@ -161,7 +161,8 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
           item.exerciseName,
           item.weight,
           item.reps,
-          item.clientId
+          item.clientId,
+          item.prescription
         );
         if (!result.ok) break;
         dequeue(item.clientId);
@@ -208,13 +209,23 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
 
     // Fiilen yapılan hareketi logluyoruz: swap varsa ikamenin adı gider,
     // böylece geçmiş gerçekte yapılanı yansıtır.
+    const current = active[index];
     const item: PendingSet = {
       clientId: newClientId(),
       sessionId,
-      exerciseName: active[index].performedName,
+      exerciseName: current.performedName,
       weight: weightNum,
       reps: repsNum,
       queuedAt: new Date().toISOString(),
+      // Motorun ne önerdiğini kullanıcının girdiğiyle birlikte saklıyoruz;
+      // uyum oranı ancak ikisi bir arada olursa hesaplanabiliyor.
+      prescription: {
+        weight: current.prescription.weight,
+        reps: current.prescription.reps,
+        decision: current.prescription.decision,
+        adjustmentAction: current.prescription.adjustment?.action ?? null,
+        adjustmentReason: current.prescription.adjustment?.reason ?? null,
+      },
     };
 
     // ÖNCE YEREL, SONRA SUNUCU: arayüz sunucuyu beklemiyor ve sinyal

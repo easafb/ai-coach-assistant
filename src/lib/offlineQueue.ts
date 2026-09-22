@@ -25,6 +25,17 @@ export interface PendingSet {
   weight: number;
   reps: number;
   queuedAt: string;
+  /**
+   * Motorun bu set için ne önerdiği. Kuyrukta da taşınıyor: çevrimdışı
+   * kaydedilen setlerde reçete bilgisi kaybolursa uyum oranı eksik çıkar.
+   */
+  prescription?: {
+    weight: number | null;
+    reps: number;
+    decision: string;
+    adjustmentAction: string | null;
+    adjustmentReason: string | null;
+  };
 }
 
 /** localStorage her ortamda yok (SSR, gizli mod, kapalı site verisi). */
