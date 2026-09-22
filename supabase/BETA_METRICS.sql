@@ -220,3 +220,87 @@ select
 from public.set_logs
 where adjustment_action is not null
 group by adjustment_action;
+
+
+-- ==========================================================================
+-- 9. HUNİ — olay tablosundan çıkan dört sayı
+-- ==========================================================================
+
+-- 9a. KAYIT -> İLK TAMAMLANMIŞ ANTRENMAN
+-- Eşik: %70 üzeri giriş akışı sağlam, altıysa sorun üründe değil ilk
+-- 60 saniyede.
+with kayit as (
+  select distinct user_id from public.events where name = 'signup_completed'
+),
+rutin as (
+  select distinct user_id from public.events where name = 'routine_created'
+),
+basladi as (
+  select distinct user_id from public.events where name = 'workout_started'
+),
+bitirdi as (
+  select distinct user_id from public.events where name = 'workout_completed'
+)
+select
+  (select count(*) from kayit)     as kaydolan,
+  (select count(*) from rutin)     as rutin_olusturan,
+  (select count(*) from basladi)   as antrenman_baslatan,
+  (select count(*) from bitirdi)   as antrenman_bitiren,
+  round(100.0 * (select count(*) from bitirdi)
+        / nullif((select count(*) from kayit), 0), 1) as kayit_to_antrenman_yuzde;
+
+
+-- 9b. İLK ANTRENMANA KADAR GEÇEN SÜRE
+-- 24 saati geçenler büyük ihtimalle hiç gelmez.
+select
+  round(extract(epoch from (ilk_antrenman - kayit)) / 3600, 1) as saat,
+  count(*) as kullanici
+from (
+  select
+    e.user_id,
+    min(e.created_at) filter (where e.name = 'signup_completed')  as kayit,
+    min(e.created_at) filter (where e.name = 'workout_completed') as ilk_antrenman
+  from public.events e
+  group by e.user_id
+) t
+where kayit is not null and ilk_antrenman is not null
+group by 1
+order by 1;
+
+
+-- 9c. HAFTADA 2+ SEANS YAPAN KULLANICI — takip edilecek tek kuzey yıldızı
+select
+  date_trunc('week', created_at)::date as hafta,
+  count(*) filter (where seans >= 2)   as haftada_2_artı_yapan,
+  count(*)                             as aktif_kullanici
+from (
+  select user_id, date_trunc('week', created_at) as created_at, count(*) as seans
+  from public.events
+  where name = 'workout_completed'
+  group by user_id, date_trunc('week', created_at)
+) t
+group by 1
+order by 1 desc;
+
+
+-- 9d. KOÇ AÇILMA SIKLIĞI (kullanıcı/hafta)
+-- 1'in altındaysa koç tek başına satılmaz, pakete girer.
+select
+  date_trunc('week', created_at)::date                  as hafta,
+  count(*) filter (where name = 'coach_opened')         as acilma,
+  count(*) filter (where name = 'coach_message_sent')   as mesaj,
+  count(distinct user_id)                               as kullanici,
+  round(count(*) filter (where name = 'coach_opened')::numeric
+        / nullif(count(distinct user_id), 0), 2)        as kullanici_basina_acilma
+from public.events
+where name in ('coach_opened', 'coach_message_sent')
+group by 1
+order by 1 desc;
+
+
+-- 9e. SEANS İÇİ SÜRTÜNME: terk edilen / tamamlanan
+select
+  count(*) filter (where name = 'workout_completed') as tamamlanan,
+  count(*) filter (where name = 'workout_abandoned') as terk_edilen,
+  count(*) filter (where name = 'workout_resumed')   as devam_edilen
+from public.events;

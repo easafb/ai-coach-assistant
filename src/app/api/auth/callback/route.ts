@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { createClient } from "@/lib/supabase/server";
 import { CURRENT_POLICY_VERSION } from "@/lib/consent";
+import { track } from "@/lib/events";
 
 // Google OAuth dönüş noktası: yetki kodunu Supabase oturumuyla takas eder.
 export async function GET(request: Request) {
@@ -51,6 +52,8 @@ export async function GET(request: Request) {
     }
     cookieStore.delete("pending_consent");
   }
+
+  await track("signup_completed");
 
   return NextResponse.redirect(`${origin}${safeNext}`);
 }

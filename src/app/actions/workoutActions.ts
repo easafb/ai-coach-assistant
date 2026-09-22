@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireUser } from "@/lib/dal";
 import { findTemplate } from "@/lib/templates";
 import { validateAdjustments, type Adjustment } from "@/lib/adjustments";
+import { track } from "@/lib/events";
 import {
   getUserExerciseNames,
   getExerciseResolver,
@@ -81,6 +82,11 @@ export async function createRoutineAction(
     await supabase.from("routines").delete().eq("id", routine.id).eq("user_id", user.id);
     return dbFail("createRoutine.exercises", exerciseError);
   }
+
+  await track("routine_created", {
+    routineId: routine.id,
+    exerciseCount: cleaned.length,
+  });
 
   revalidatePath("/dashboard");
   return ok({ routineId: routine.id as string });
@@ -215,9 +221,16 @@ export async function startWorkoutAction(
   const stale = (open ?? []).filter((s) => s.id !== resumable?.id);
   for (const session of stale) {
     await closeSession(session.id as string, user.id);
+    // Terk edilmiş seans: seans içi sürtünmenin göstergesi.
+    await track("workout_abandoned", {
+      routineId,
+      sessionId: session.id,
+      startedAt: session.start_time,
+    });
   }
 
   if (resumable) {
+    await track("workout_resumed", { routineId, sessionId: resumable.id });
     return ok({ sessionId: resumable.id as string, resumed: true });
   }
 
@@ -229,6 +242,8 @@ export async function startWorkoutAction(
 
   if (error) return dbFail("startWorkout.insert", error);
   if (!data) return fail("Antrenman başlatılamadı.");
+
+  await track("workout_started", { routineId, sessionId: data.id });
   return ok({ sessionId: data.id as string, resumed: false });
 }
 
@@ -355,6 +370,12 @@ export async function finishWorkoutAction(sessionId: string): Promise<ActionResu
 
   if (error) return dbFail("finishWorkout.update", error);
   if (!data) return fail("Bu antrenmana erişim yetkin yok.");
+
+  await track("workout_completed", {
+    sessionId,
+    totalVolume,
+    setCount: (sets ?? []).length,
+  });
 
   revalidatePath("/dashboard");
   revalidatePath("/history");
@@ -493,6 +514,12 @@ export async function saveAdjustmentsAction(
   );
 
   if (error) return dbFail("saveAdjustments", error);
+
+  // Ürünün en yüksek değerli anı: kullanıcı kısıt bildirdi, plan değişti.
+  await track("adjustment_applied", {
+    count: validated.length,
+    actions: validated.map((a) => a.action),
+  });
 
   revalidatePath("/dashboard");
   revalidatePath("/coach");
