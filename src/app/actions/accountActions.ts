@@ -24,31 +24,102 @@ export async function exportUserDataAction(): Promise<
   const [routines, exercises, sessions, sets, adjustments, customs, feedback] =
     await Promise.all([
       supabase.from("routines").select("*").eq("user_id", user.id),
-      supabase.from("routine_exercises").select("*, routines!inner(user_id)").eq("routines.user_id", user.id),
+      supabase
+        .from("routine_exercises")
+        .select("*, routines!inner(user_id)")
+        .eq("routines.user_id", user.id),
       supabase.from("workout_sessions").select("*").eq("user_id", user.id),
-      supabase.from("set_logs").select("*, workout_sessions!inner(user_id)").eq("workout_sessions.user_id", user.id),
+      supabase
+        .from("set_logs")
+        .select("*, workout_sessions!inner(user_id)")
+        .eq("workout_sessions.user_id", user.id),
       supabase.from("exercise_adjustments").select("*").eq("user_id", user.id),
       supabase.from("custom_exercises").select("*").eq("user_id", user.id),
       supabase.from("feedback").select("*").eq("user_id", user.id),
     ]);
 
+  // Rutin adlarını kimlik yerine isimle gösterebilmek için eşleme.
+  const routineNames = new Map(
+    (routines.data ?? []).map((r) => [r.id as string, r.name as string])
+  );
+  const sessionNames = new Map(
+    (sessions.data ?? []).map((s) => [
+      s.id as string,
+      (s.routine_name as string) ?? "Antrenman",
+    ])
+  );
+
+  /*
+   * Çıktı kasıtlı olarak yeniden biçimlendiriliyor.
+   * Ham satırlar üç sorun içeriyordu:
+   *   - filtreleme için kullanılan join artıkları (routines: { user_id })
+   *   - her satırda tekrar eden kullanıcı kimliği
+   *   - artık okunmayan eski kolonlar (default_reps, increment)
+   * KVKK kapsamında verilen çıktının kullanıcı için ANLAŞILIR olması gerekiyor;
+   * veritabanı iç yapısını paylaşmak amaç değil.
+   */
   return {
     ok: true,
     data: {
       disaAktarimTarihi: new Date().toISOString(),
       hesap: {
-        id: user.id,
         eposta: user.email ?? null,
         kayitTarihi: user.created_at ?? null,
         saglayici: user.app_metadata?.provider ?? null,
       },
-      rutinler: routines.data ?? [],
-      rutinEgzersizleri: exercises.data ?? [],
-      antrenmanlar: sessions.data ?? [],
-      setKayitlari: sets.data ?? [],
-      programAyarlamalari: adjustments.data ?? [],
-      kendiHareketlerim: customs.data ?? [],
-      geriBildirimlerim: feedback.data ?? [],
+      programlarim: (routines.data ?? []).map((r) => ({
+        ad: r.name,
+        olusturulma: r.created_at,
+        hareketler: (exercises.data ?? [])
+          .filter((e) => e.routine_id === r.id)
+          .sort((a, b) => (a.order_index as number) - (b.order_index as number))
+          .map((e) => ({
+            hareket: e.exercise_name,
+            set: e.default_sets,
+            tekrarAlt: e.min_reps,
+            tekrarUst: e.max_reps,
+          })),
+      })),
+      antrenmanlarim: (sessions.data ?? []).map((s) => ({
+        program: s.routine_name ?? null,
+        baslangic: s.start_time,
+        bitis: s.end_time,
+        toplamHacimKg: s.total_volume === null ? null : Number(s.total_volume),
+        tamamlandi: s.end_time !== null,
+        setler: (sets.data ?? [])
+          .filter((l) => l.session_id === s.id)
+          .map((l) => ({
+            hareket: l.exercise_name,
+            agirlikKg: Number(l.weight),
+            tekrar: l.reps,
+            zaman: l.logged_at,
+          })),
+      })),
+      programAyarlamalarim: (adjustments.data ?? []).map((a) => ({
+        hareket: a.exercise_name,
+        eylem: a.action,
+        yerineGecen: a.substitute_name,
+        gerekce: a.reason,
+        olusturulma: a.created_at,
+        gecerlilikSonu: a.expires_at,
+      })),
+      kendiHareketlerim: (customs.data ?? []).map((c) => ({
+        hareket: c.exercise_name,
+        kasGrubu: c.muscle_group,
+        tip: c.exercise_type === "isolation" ? "izolasyon" : "bileşik",
+        enKucukArtisKg: Number(c.min_step),
+        olusturulma: c.created_at,
+      })),
+      geriBildirimlerim: (feedback.data ?? []).map((f) => ({
+        tur: f.kind === "error" ? "otomatik hata raporu" : "geri bildirim",
+        mesaj: f.message,
+        tarih: f.created_at,
+      })),
+      // Kullanılmayan eşlemeler bilerek dışarıda; çıktıda iç kimlik yok.
+      _not:
+        `Bu dosya ${routineNames.size} program ve ${sessionNames.size} antrenman ` +
+        "kaydı içeriyor. Kişisel verilerinle ilgili soruların için " +
+        "easafb1907@gmail.com adresine yazabilirsin.",
     },
   };
 }
