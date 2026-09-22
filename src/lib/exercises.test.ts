@@ -162,3 +162,12 @@ test("şablonlarda süre bazlı hedefler makul aralıkta", () => {
     }
   }
 });
+
+test("ağırlıksız hareketler işaretli, halter hareketleri değil", async () => {
+  const { catalogResolver } = await import("./exercises.ts");
+  assert.equal(catalogResolver("Plank")?.bodyweight, true);
+  assert.equal(catalogResolver("şınav")?.bodyweight, true);
+  assert.equal(catalogResolver("Pull Up")?.bodyweight, true);
+  assert.equal(catalogResolver("Bench Press")?.bodyweight, false);
+  assert.equal(catalogResolver("Back Squat")?.bodyweight, false);
+});

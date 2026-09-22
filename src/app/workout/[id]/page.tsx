@@ -65,6 +65,7 @@ export default async function WorkoutPage({
       maxReps: exercise.max_reps,
       exerciseType: resolve(exercise.exercise_name)?.type ?? "compound",
       unit: resolve(exercise.exercise_name)?.unit ?? "reps",
+      bodyweight: resolve(exercise.exercise_name)?.bodyweight ?? false,
       classified: resolve(exercise.exercise_name) !== undefined,
       prescription: adjusted,
     };

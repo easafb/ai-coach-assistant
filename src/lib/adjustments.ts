@@ -163,7 +163,10 @@ export function applyAdjustment(
       };
 
     case "reduce_load": {
-      if (prescription.weight == null) {
+      // 0 kg da "ağırlık yok" demek: azaltılacak yük yok. Bu kontrol
+      // olmadan alt sınır (increment) devreye girip ağırlıksız harekete
+      // 2.5 kg YÜKLÜYORDU — "hafiflet" diyen ayarlama yükü artırıyordu.
+      if (prescription.weight == null || prescription.weight === 0) {
         return { ...base, rationale: `${adjustment.reason} Bugün hafif tut.` };
       }
       const reduced =
@@ -201,6 +204,8 @@ export interface WorkoutPlanItem {
   exerciseType: ExerciseType;
   /** Tekrarla mı süreyle mi ölçülüyor; arayüz etiketleri buna göre. */
   unit: ExerciseUnit;
+  /** Ağırlıksız yapılabilen hareket: ağırlık alanı isteğe bağlı. */
+  bodyweight: boolean;
   /**
    * Hareket katalogda ya da kullanıcının kendi kayıtlarında tanımlı mı?
    * Değilse artış adımı tahmine düşüyor ve AI ona ikame öneremiyor.
