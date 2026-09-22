@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 
 import { createCustomExerciseAction } from "@/app/actions/workoutActions";
-import type { MuscleGroup, ExerciseType } from "@/lib/exercises";
+import type { MuscleGroup, ExerciseType, ExerciseUnit } from "@/lib/exercises";
 
 const GROUPS: MuscleGroup[] = ["göğüs", "sırt", "omuz", "kol", "bacak", "karın"];
 
@@ -22,6 +22,7 @@ interface Props {
 export default function ExerciseClassifier({ name, onDone, onCancel }: Props) {
   const [group, setGroup] = useState<MuscleGroup | null>(null);
   const [type, setType] = useState<ExerciseType>("compound");
+  const [unit, setUnit] = useState<ExerciseUnit>("reps");
   const [minStep, setMinStep] = useState<1.25 | 2.5 | 5>(2.5);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -30,7 +31,7 @@ export default function ExerciseClassifier({ name, onDone, onCancel }: Props) {
     if (!group) return;
     setError(null);
     startTransition(async () => {
-      const result = await createCustomExerciseAction(name, group, type, minStep);
+      const result = await createCustomExerciseAction(name, group, type, unit, minStep);
       if (result.ok) onDone(result.data.name);
       else setError(result.error);
     });
@@ -62,6 +63,26 @@ export default function ExerciseClassifier({ name, onDone, onCancel }: Props) {
           </button>
         ))}
       </div>
+
+      <p className="mb-2 text-xs font-bold text-slate-400">Nasıl ölçülüyor?</p>
+      <div className="mb-4 flex gap-2">
+        {(["reps", "seconds"] as const).map((u) => (
+          <button
+            key={u}
+            type="button"
+            onClick={() => setUnit(u)}
+            className={`min-h-11 flex-1 rounded-xl px-3 text-sm font-bold transition-colors ${
+              unit === u ? "bg-blue-600 text-white" : "bg-white/5 text-slate-300"
+            }`}
+          >
+            {u === "reps" ? "Tekrar" : "Süre (saniye)"}
+          </button>
+        ))}
+      </div>
+      <p className="mb-4 text-[11px] leading-snug text-slate-500">
+        Plank gibi sabit duruşlar süreyle ölçülür; kaldırma hareketleri
+        tekrarla.
+      </p>
 
       <p className="mb-2 text-xs font-bold text-slate-400">Hareket tipi?</p>
       <div className="mb-4 flex gap-2">
