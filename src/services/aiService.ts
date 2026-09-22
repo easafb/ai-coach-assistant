@@ -2,6 +2,7 @@
 
 import { requireUser } from "@/lib/dal";
 import { getConsent, isConsentValid } from "@/lib/consent";
+import { track } from "@/lib/events";
 import { checkAiRateLimit, recordAiRequest } from "@/lib/rateLimit";
 import {
   getUserExerciseNames,
@@ -151,6 +152,8 @@ export async function requestCoachPlan(
   if (trimmed.length > 1000) {
     return { ok: false, error: "Mesaj çok uzun." };
   }
+
+  await track("coach_message_sent", { length: trimmed.length });
 
   const [userExercises, resolve, summary] = await Promise.all([
     getUserExerciseNames(),
