@@ -158,3 +158,65 @@ order by s.start_time desc;
 --       ), 0)
 --   where s.end_time is null
 --     and s.start_time < now() - interval '12 hours';
+
+
+-- ==========================================================================
+-- 8. UYUM ORANI — motorun güvenilirliğinin tek ölçülebilir göstergesi
+--
+-- Motor bir ağırlık öneriyor, arayüz input'a dolduruyor, kullanıcı kabul
+-- ediyor ya da üstüne yazıyor. Uyum oranı = kabul edilen / toplam.
+--
+-- 014'ten ÖNCEKİ kayıtlarda prescribed_weight yok; onlar hesap dışı.
+-- Bu yüzden ilk günlerde az veri görürsün, zamanla birikir.
+-- ==========================================================================
+
+-- Karar tipine göre ayrı ayrı. Bu ayrım kritik: deload önerisine uyulmaması
+-- ile add-weight önerisine uyulmaması TAMAMEN farklı şeyler anlatır.
+-- Deload'a uyulmuyorsa kullanıcı motoru değil egosunu dinliyordur.
+select
+  decision                                              as karar,
+  count(*)                                              as set_sayisi,
+  count(*) filter (where weight = prescribed_weight)    as uyulan,
+  round(
+    100.0 * count(*) filter (where weight = prescribed_weight) / count(*), 1
+  )                                                     as uyum_yuzdesi,
+  round(avg(weight - prescribed_weight), 2)             as ortalama_sapma_kg
+from public.set_logs
+where prescribed_weight is not null
+  and decision is not null
+  and decision <> 'first-time'
+group by decision
+order by set_sayisi desc;
+
+
+-- Genel uyum oranı (karar tablosundaki eşiklerle karşılaştırılacak sayı)
+select
+  count(*)                                           as toplam_set,
+  count(*) filter (where weight = prescribed_weight) as uyulan,
+  round(
+    100.0 * count(*) filter (where weight = prescribed_weight) / nullif(count(*), 0), 1
+  )                                                  as uyum_yuzdesi
+from public.set_logs
+where prescribed_weight is not null and decision <> 'first-time';
+
+
+-- Tekrar hedefine uyum (ağırlıktan ayrı ölçülür)
+select
+  count(*)                                        as toplam_set,
+  count(*) filter (where reps >= prescribed_reps) as hedefe_ulasan,
+  round(
+    100.0 * count(*) filter (where reps >= prescribed_reps) / nullif(count(*), 0), 1
+  )                                               as yuzde
+from public.set_logs
+where prescribed_reps is not null;
+
+
+-- Koç devreye girdiğinde ne oluyor? (en yüksek değerli an)
+select
+  adjustment_action                                  as eylem,
+  count(*)                                           as set_sayisi,
+  count(distinct adjustment_reason)                  as farkli_gerekce,
+  count(*) filter (where weight = prescribed_weight) as uyulan
+from public.set_logs
+where adjustment_action is not null
+group by adjustment_action;

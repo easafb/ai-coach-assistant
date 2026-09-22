@@ -273,7 +273,19 @@ export async function logSetAction(
    * gönderebilir (cevap dönerken bağlantı koparsa); bu kimlik sayesinde
    * ikinci gönderim çift kayıt yaratmıyor.
    */
-  clientId?: string
+  clientId?: string,
+  /**
+   * Motorun bu set için ne önerdiği. Kullanıcının girdiğiyle birlikte
+   * saklanıyor ki UYUM ORANI hesaplanabilsin — motorun doğru çalışıp
+   * çalışmadığının tek ölçülebilir göstergesi bu.
+   */
+  prescription?: {
+    weight: number | null;
+    reps: number;
+    decision: string;
+    adjustmentAction: string | null;
+    adjustmentReason: string | null;
+  }
 ): Promise<ActionResult> {
   const user = await requireUser();
 
@@ -295,6 +307,11 @@ export async function logSetAction(
       weight,
       reps,
       client_id: clientId ?? null,
+      prescribed_weight: prescription?.weight ?? null,
+      prescribed_reps: prescription?.reps ?? null,
+      decision: prescription?.decision ?? null,
+      adjustment_action: prescription?.adjustmentAction ?? null,
+      adjustment_reason: prescription?.adjustmentReason ?? null,
     },
   ]);
 
