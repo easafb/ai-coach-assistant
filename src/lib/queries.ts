@@ -395,3 +395,61 @@ export async function getRoutine(routineId: string): Promise<Routine | null> {
 
   return (data as Routine | null) ?? null;
 }
+
+export interface OpenSession {
+  sessionId: string;
+  startedAt: string;
+  /** Normalize edilmiş hareket adı -> o seansta kaydedilmiş set sayısı. */
+  setCounts: Record<string, number>;
+}
+
+/**
+ * Bu rutin için yarım kalmış (bitirilmemiş) bir antrenman var mı?
+ *
+ * Uygulama arkadan kapatıldığında, telefon kapandığında veya sekme
+ * kapatıldığında seans end_time = null olarak kalıyordu. Geçmiş, haftalık
+ * hacim ve ilerleme motoru bitmemiş seansları filtrelediği için o antrenman
+ * hiç yapılmamış sayılıyordu — kaydedilen setler dahil.
+ *
+ * @param maxAgeHours Bundan eski seanslar "devam edilebilir" sayılmaz;
+ *   dünkü yarım antrenmana bugün devam etmek yanlış olur.
+ */
+export async function getOpenSession(
+  routineId: string,
+  maxAgeHours = 6
+): Promise<OpenSession | null> {
+  const user = await requireUser();
+  const supabase = await createClient();
+
+  const since = new Date(Date.now() - maxAgeHours * 3_600_000).toISOString();
+
+  const { data: session } = await supabase
+    .from("workout_sessions")
+    .select("id, start_time")
+    .eq("user_id", user.id)
+    .eq("routine_id", routineId)
+    .is("end_time", null)
+    .gte("start_time", since)
+    .order("start_time", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!session) return null;
+
+  const { data: logs } = await supabase
+    .from("set_logs")
+    .select("exercise_name")
+    .eq("session_id", session.id as string);
+
+  const setCounts: Record<string, number> = {};
+  for (const log of logs ?? []) {
+    const key = normalizeExerciseName(log.exercise_name as string);
+    setCounts[key] = (setCounts[key] ?? 0) + 1;
+  }
+
+  return {
+    sessionId: session.id as string,
+    startedAt: session.start_time as string,
+    setCounts,
+  };
+}

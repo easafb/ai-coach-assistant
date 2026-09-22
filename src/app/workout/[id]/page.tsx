@@ -5,6 +5,7 @@ import {
   getExerciseHistory,
   getActiveAdjustments,
   getExerciseResolver,
+  getOpenSession,
 } from "@/lib/queries";
 import { prescribe, normalizeExerciseName } from "@/lib/progression";
 import { applyAdjustment, type WorkoutPlanItem } from "@/lib/adjustments";
@@ -19,11 +20,12 @@ export default async function WorkoutPage({
   await requireConsent();
   const { id } = await params;
 
-  const [exercises, history, adjustments, resolve] = await Promise.all([
+  const [exercises, history, adjustments, resolve, openSession] = await Promise.all([
     getRoutineExercises(id),
     getExerciseHistory(),
     getActiveAdjustments(),
     getExerciseResolver(),
+    getOpenSession(id),
   ]);
 
   if (exercises.length === 0) notFound();
@@ -66,5 +68,5 @@ export default async function WorkoutPage({
     };
   });
 
-  return <ActiveWorkout routineId={id} plan={plan} />;
+  return <ActiveWorkout routineId={id} plan={plan} openSession={openSession} />;
 }
