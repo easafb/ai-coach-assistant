@@ -13,6 +13,7 @@ import {
   Ban,
   HelpCircle,
   RotateCw,
+  CloudOff,
 } from "lucide-react";
 
 import {
@@ -26,6 +27,14 @@ import type { OpenSession } from "@/lib/queries";
 import { normalizeExerciseName } from "@/lib/progression";
 import { useWakeLock } from "@/hooks/useWakeLock";
 import RestTimer, { DEFAULT_REST } from "@/components/workout/RestTimer";
+import {
+  enqueue,
+  dequeue,
+  pendingFor,
+  isDefinitelyOffline,
+  newClientId,
+  type PendingSet,
+} from "@/lib/offlineQueue";
 import ExerciseClassifier from "@/components/routines/ExerciseClassifier";
 
 interface Props {
@@ -82,6 +91,11 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
   // Set kaydedilince artan sayaç; RestTimer bunu görünce baştan başlıyor.
   const [restTick, setRestTick] = useState(0);
   const [restSeconds, setRestSeconds] = useState(0);
+  // Sunucuya gönderilmeyi bekleyen set sayısı; arayüzde gösteriliyor.
+  const [pendingCount, setPendingCount] = useState(0);
+  // Kuyruk boşalınca antrenmanı bitirmeyi bekleyen bayrak.
+  const [finishWhenSynced, setFinishWhenSynced] = useState(false);
+  const [offline, setOffline] = useState(false);
   const [isPending, startTransition] = useTransition();
 
   const hasStarted = sessionId !== null;
@@ -96,6 +110,9 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
   }, [hasStarted]);
 
   const weightInput = useRef<HTMLInputElement>(null);
+  // Aynı anda iki boşaltma çalışırsa aynı set iki kez gönderilir; idempotency
+  // bunu zaten güvenli kılıyor ama gereksiz istek de atmıyoruz.
+  const flushing = useRef(false);
 
   const loggedSoFar = Object.values(setsByExercise).reduce((a, b) => a + b, 0);
 
@@ -128,6 +145,56 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
     });
   };
 
+  /**
+   * Kuyruktaki setleri sırayla gönderir.
+   * Bir istek başarısız olursa durur: sıra korunmalı ve bağlantı yokken
+   * kalan istekleri denemenin anlamı yok.
+   */
+  const flushQueue = async (sid: string) => {
+    if (flushing.current) return;
+    flushing.current = true;
+
+    try {
+      for (const item of pendingFor(sid)) {
+        const result = await logSetAction(
+          item.sessionId,
+          item.exerciseName,
+          item.weight,
+          item.reps,
+          item.clientId
+        );
+        if (!result.ok) break;
+        dequeue(item.clientId);
+      }
+    } catch {
+      // Ağ hatası: kuyruk duruyor, bağlantı gelince tekrar denenecek.
+    } finally {
+      flushing.current = false;
+      setPendingCount(pendingFor(sid).length);
+    }
+  };
+
+  // Bağlantı geri geldiğinde kuyruğu boşalt ve durumu arayüze yansıt.
+  useEffect(() => {
+    if (!sessionId) return;
+
+    const onOnline = () => {
+      setOffline(false);
+      void flushQueue(sessionId);
+    };
+    const onOffline = () => setOffline(true);
+
+    setOffline(isDefinitelyOffline());
+    window.addEventListener("online", onOnline);
+    window.addEventListener("offline", onOffline);
+    void flushQueue(sessionId);
+
+    return () => {
+      window.removeEventListener("online", onOnline);
+      window.removeEventListener("offline", onOffline);
+    };
+  }, [sessionId]);
+
   const handleLogSet = () => {
     if (!sessionId) return;
 
@@ -139,40 +206,67 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
       return;
     }
 
-    setError(null);
-    startTransition(async () => {
-      // Fiilen yapılan hareketi logluyoruz: swap varsa ikamenin adı gider,
-      // böylece geçmiş gerçekte yapılanı yansıtır.
-      const result = await logSetAction(
-        sessionId,
-        active[index].performedName,
-        weightNum,
-        repsNum
-      );
+    // Fiilen yapılan hareketi logluyoruz: swap varsa ikamenin adı gider,
+    // böylece geçmiş gerçekte yapılanı yansıtır.
+    const item: PendingSet = {
+      clientId: newClientId(),
+      sessionId,
+      exerciseName: active[index].performedName,
+      weight: weightNum,
+      reps: repsNum,
+      queuedAt: new Date().toISOString(),
+    };
 
-      if (result.ok) {
-        const id = active[index].exerciseId;
-        setSetsByExercise((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
-        setReps(String(active[index].prescription.reps));
-        // Dinlenme süresi hareket tipinden geliyor; bileşikler daha uzun.
-        setRestSeconds(DEFAULT_REST[active[index].exerciseType]);
-        setRestTick((t) => t + 1);
-        weightInput.current?.focus();
-      } else {
-        setError(result.error);
-      }
+    // ÖNCE YEREL, SONRA SUNUCU: arayüz sunucuyu beklemiyor ve sinyal
+    // kesikse set kaybolmuyor.
+    enqueue(item);
+    setError(null);
+
+    const id = active[index].exerciseId;
+    setSetsByExercise((prev) => ({ ...prev, [id]: (prev[id] ?? 0) + 1 }));
+    setReps(String(active[index].prescription.reps));
+    setRestSeconds(DEFAULT_REST[active[index].exerciseType]);
+    setRestTick((t) => t + 1);
+    setPendingCount(pendingFor(sessionId).length);
+    weightInput.current?.focus();
+
+    startTransition(async () => {
+      await flushQueue(sessionId);
     });
   };
 
   const handleFinish = () => {
     if (!sessionId) return;
     setError(null);
+
     startTransition(async () => {
+      // Hacim sunucuda set_logs'tan hesaplanıyor; bekleyen setler gönderilmeden
+      // bitirmek eksik hacim kaydetmek demek.
+      await flushQueue(sessionId);
+
+      if (pendingFor(sessionId).length > 0) {
+        setFinishWhenSynced(true);
+        setError(
+          "Bazı setler henüz gönderilemedi. Bağlantı gelince antrenman otomatik bitirilecek."
+        );
+        return;
+      }
+
       const result = await finishWorkoutAction(sessionId);
       if (result.ok) router.push(`/workout/summary/${sessionId}`);
       else setError(result.error);
     });
   };
+
+  // Kuyruk boşaldıysa ve kullanıcı bitirmek istemişse otomatik tamamla.
+  useEffect(() => {
+    if (!finishWhenSynced || !sessionId || pendingCount > 0) return;
+    setFinishWhenSynced(false);
+    void (async () => {
+      const result = await finishWorkoutAction(sessionId);
+      if (result.ok) router.push(`/workout/summary/${sessionId}`);
+    })();
+  }, [finishWhenSynced, pendingCount, sessionId, router]);
 
   // ---------------------------------------------------------------- başlangıç
   if (!hasStarted) {
@@ -343,6 +437,22 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
             <p className="font-mono text-2xl font-bold text-blue-400">{totalSets}</p>
           </div>
         </div>
+
+        {/* Setler yerel olarak kaydedildi ama henüz gönderilmedi. Kullanıcı
+            verisinin kaybolmadığını bilmeli; sessizce beklemek endişe yaratır. */}
+        {(offline || pendingCount > 0) && (
+          <div
+            role="status"
+            className="animate-rise mb-6 flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 p-4"
+          >
+            <CloudOff size={18} className="shrink-0 text-amber-500" />
+            <p className="text-sm font-medium leading-snug text-amber-200">
+              {pendingCount > 0
+                ? `${pendingCount} set cihazına kaydedildi, bağlantı gelince gönderilecek.`
+                : "İnternet yok. Setlerin cihazına kaydediliyor, bağlantı gelince gönderilecek."}
+            </p>
+          </div>
+        )}
 
         <div
           key={current.exerciseId}

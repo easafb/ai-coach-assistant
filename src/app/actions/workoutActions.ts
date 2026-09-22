@@ -267,7 +267,13 @@ export async function logSetAction(
   sessionId: string,
   exerciseName: string,
   weight: number,
-  reps: number
+  reps: number,
+  /**
+   * İstemcide üretilen benzersiz kimlik. Çevrimdışı kuyruk aynı seti tekrar
+   * gönderebilir (cevap dönerken bağlantı koparsa); bu kimlik sayesinde
+   * ikinci gönderim çift kayıt yaratmıyor.
+   */
+  clientId?: string
 ): Promise<ActionResult> {
   const user = await requireUser();
 
@@ -282,10 +288,19 @@ export async function logSetAction(
   }
 
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("set_logs")
-    .insert([{ session_id: sessionId, exercise_name: exerciseName, weight, reps }]);
+  const { error } = await supabase.from("set_logs").insert([
+    {
+      session_id: sessionId,
+      exercise_name: exerciseName,
+      weight,
+      reps,
+      client_id: clientId ?? null,
+    },
+  ]);
 
+  // 23505 = benzersizlik ihlali. Bu set zaten kaydedilmiş demektir; tekrar
+  // gönderim başarılı sayılıyor ki kuyruk sonsuza kadar denemesin.
+  if (error && error.code === "23505") return ok(null);
   if (error) return dbFail("logSet", error);
   return ok(null);
 }
