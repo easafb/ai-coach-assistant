@@ -228,7 +228,28 @@ export default function ActiveWorkout({ routineId, plan, openSession }: Props) {
     setRestSeconds(DEFAULT_REST[active[index].exerciseType]);
     setRestTick((t) => t + 1);
     setPendingCount(pendingFor(sessionId).length);
-    weightInput.current?.focus();
+
+    /*
+     * Dokunmatikte ekran klavyesini KAPATIYORUZ.
+     *
+     * Önceden ağırlık alanına odaklanılıyordu ("sonraki set tek dokunuş"
+     * düşüncesiyle) ama mobilde bunun bedeli klavyenin ekranı kaplaması
+     * oldu — üstelik dinlenme sayacı tam o anda alttan geliyor ve klavye
+     * onu örtüyor. Set kaydedildikten sonra kullanıcı yazmak değil, sayacı
+     * ve ilerlemesini görmek istiyor.
+     *
+     * Masaüstünde klavye ekranı kaplamadığı için odağı korumak hâlâ hızlı;
+     * ayrımı işaretçi tipiyle yapıyoruz.
+     */
+    const coarsePointer =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(pointer: coarse)").matches;
+
+    if (coarsePointer) {
+      (document.activeElement as HTMLElement | null)?.blur();
+    } else {
+      weightInput.current?.focus();
+    }
 
     startTransition(async () => {
       await flushQueue(sessionId);
