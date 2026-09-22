@@ -68,6 +68,12 @@ export default function PrivacyPage() {
                 bildirimleri.
               </li>
               <li>
+                <strong className="text-white">Anket cevaplarınız:</strong> ilk
+                antrenmanınızdan sonra isteğe bağlı olarak verdiğiniz hedef,
+                deneyim süresi ve uygulamayı nereden duyduğunuz. Uygulamayı
+                geliştirmek için kullanılır; cevaplamak zorunlu değildir.
+              </li>
+              <li>
                 <strong className="text-white">Teknik kayıtlar:</strong> hata
                 raporları ve gönderdiğiniz geri bildirimler.
               </li>

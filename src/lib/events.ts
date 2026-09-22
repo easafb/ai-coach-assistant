@@ -22,7 +22,9 @@ export type EventName =
   | "workout_abandoned"
   | "coach_opened"
   | "coach_message_sent"
-  | "adjustment_applied";
+  | "adjustment_applied"
+  | "survey_answered"
+  | "survey_dismissed";
 
 export async function track(
   name: EventName,
